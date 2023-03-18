@@ -29,14 +29,14 @@ def resize_unscale(img, new_shape=(640, 640), color=114):
     if shape[::-1] != new_unpad:  # resize
         img = cv2.resize(img, new_unpad, interpolation=cv2.INTER_AREA)
 
-    canvas[dh:dh + new_unpad_h, dw:dw + new_unpad_w, :] = img
+    canvas[dh : dh + new_unpad_h, dw : dw + new_unpad_w, :] = img
 
     return canvas, r, dw, dh, new_unpad_w, new_unpad_h  # (dw,dh)
 
 
-def infer_yolop(weight="yolop-640-640.onnx",
-                img_path="./inference/images/7dd9ef45-f197db95.jpg"):
-
+def infer_yolop(
+    weight="yolop-640-640.onnx", img_path="./inference/images/7dd9ef45-f197db95.jpg"
+):
     ort.set_default_logger_severity(4)
     onnx_path = f"./weights/{weight}"
     ort_session = ort.InferenceSession(onnx_path)
@@ -81,8 +81,7 @@ def infer_yolop(weight="yolop-640-640.onnx",
 
     # inference: (1,n,6) (1,2,640,640) (1,2,640,640)
     det_out, da_seg_out, ll_seg_out = ort_session.run(
-        ['det_out', 'drive_area_seg', 'lane_line_seg'],
-        input_feed={"images": img}
+        ["det_out", "drive_area_seg", "lane_line_seg"], input_feed={"images": img}
     )
 
     det_out = torch.from_numpy(det_out).float()
@@ -111,8 +110,8 @@ def infer_yolop(weight="yolop-640-640.onnx",
     cv2.imwrite(save_det_path, img_det)
 
     # select da & ll segment area.
-    da_seg_out = da_seg_out[:, :, dh:dh + new_unpad_h, dw:dw + new_unpad_w]
-    ll_seg_out = ll_seg_out[:, :, dh:dh + new_unpad_h, dw:dw + new_unpad_w]
+    da_seg_out = da_seg_out[:, :, dh : dh + new_unpad_h, dw : dw + new_unpad_w]
+    ll_seg_out = ll_seg_out[:, :, dh : dh + new_unpad_h, dw : dw + new_unpad_w]
 
     da_seg_mask = np.argmax(da_seg_out, axis=1)[0]  # (?,?) (0|1)
     ll_seg_mask = np.argmax(ll_seg_out, axis=1)[0]  # (?,?) (0|1)
@@ -127,15 +126,15 @@ def infer_yolop(weight="yolop-640-640.onnx",
     # convert to BGR
     color_seg = color_seg[..., ::-1]
     color_mask = np.mean(color_seg, 2)
-    img_merge = canvas[dh:dh + new_unpad_h, dw:dw + new_unpad_w, :]
+    img_merge = canvas[dh : dh + new_unpad_h, dw : dw + new_unpad_w, :]
     img_merge = img_merge[:, :, ::-1]
 
     # merge: resize to original size
-    img_merge[color_mask != 0] = \
+    img_merge[color_mask != 0] = (
         img_merge[color_mask != 0] * 0.5 + color_seg[color_mask != 0] * 0.5
+    )
     img_merge = img_merge.astype(np.uint8)
-    img_merge = cv2.resize(img_merge, (width, height),
-                           interpolation=cv2.INTER_LINEAR)
+    img_merge = cv2.resize(img_merge, (width, height), interpolation=cv2.INTER_LINEAR)
     for i in range(boxes.shape[0]):
         x1, y1, x2, y2, conf, label = boxes[i]
         x1, y1, x2, y2, label = int(x1), int(y1), int(x2), int(y2), int(label)
@@ -144,14 +143,16 @@ def infer_yolop(weight="yolop-640-640.onnx",
     # da: resize to original size
     da_seg_mask = da_seg_mask * 255
     da_seg_mask = da_seg_mask.astype(np.uint8)
-    da_seg_mask = cv2.resize(da_seg_mask, (width, height),
-                             interpolation=cv2.INTER_LINEAR)
+    da_seg_mask = cv2.resize(
+        da_seg_mask, (width, height), interpolation=cv2.INTER_LINEAR
+    )
 
     # ll: resize to original size
     ll_seg_mask = ll_seg_mask * 255
     ll_seg_mask = ll_seg_mask.astype(np.uint8)
-    ll_seg_mask = cv2.resize(ll_seg_mask, (width, height),
-                             interpolation=cv2.INTER_LINEAR)
+    ll_seg_mask = cv2.resize(
+        ll_seg_mask, (width, height), interpolation=cv2.INTER_LINEAR
+    )
 
     cv2.imwrite(save_merge_path, img_merge)
     cv2.imwrite(save_da_path, da_seg_mask)
@@ -162,8 +163,10 @@ def infer_yolop(weight="yolop-640-640.onnx",
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--weight', type=str, default="yolop-640-640.onnx")
-    parser.add_argument('--img', type=str, default="./inference/images/9aa94005-ff1d4c9a.jpg")
+    parser.add_argument("--weight", type=str, default="yolop-640-640.onnx")
+    parser.add_argument(
+        "--img", type=str, default="./inference/images/9aa94005-ff1d4c9a.jpg"
+    )
     args = parser.parse_args()
 
     infer_yolop(weight=args.weight, img_path=args.img)

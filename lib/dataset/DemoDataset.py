@@ -16,21 +16,22 @@ from tqdm import tqdm
 
 from ..utils import letterbox_for_img, clean_str
 
-img_formats = ['.bmp', '.jpg', '.jpeg', '.png', '.tif', '.tiff', '.dng']
-vid_formats = ['.mov', '.avi', '.mp4', '.mpg', '.mpeg', '.m4v', '.wmv', '.mkv']
+img_formats = [".bmp", ".jpg", ".jpeg", ".png", ".tif", ".tiff", ".dng"]
+vid_formats = [".mov", ".avi", ".mp4", ".mpg", ".mpeg", ".m4v", ".wmv", ".mkv"]
+
 
 class LoadImages:  # for inference
     def __init__(self, path, img_size=640):
         p = str(Path(path))  # os-agnostic
         p = os.path.abspath(p)  # absolute path
-        if '*' in p:
+        if "*" in p:
             files = sorted(glob.glob(p, recursive=True))  # glob
         elif os.path.isdir(p):
-            files = sorted(glob.glob(os.path.join(p, '*.*')))  # dir
+            files = sorted(glob.glob(os.path.join(p, "*.*")))  # dir
         elif os.path.isfile(p):
             files = [p]  # files
         else:
-            raise Exception('ERROR: %s does not exist' % p)
+            raise Exception("ERROR: %s does not exist" % p)
 
         images = [x for x in files if os.path.splitext(x)[-1].lower() in img_formats]
         videos = [x for x in files if os.path.splitext(x)[-1].lower() in vid_formats]
@@ -40,13 +41,15 @@ class LoadImages:  # for inference
         self.files = images + videos
         self.nf = ni + nv  # number of files
         self.video_flag = [False] * ni + [True] * nv
-        self.mode = 'images'
+        self.mode = "images"
         if any(videos):
             self.new_video(videos[0])  # new video
         else:
             self.cap = None
-        assert self.nf > 0, 'No images or videos found in %s. Supported formats are:\nimages: %s\nvideos: %s' % \
-                            (p, img_formats, vid_formats)
+        assert self.nf > 0, (
+            "No images or videos found in %s. Supported formats are:\nimages: %s\nvideos: %s"
+            % (p, img_formats, vid_formats)
+        )
 
     def __iter__(self):
         self.count = 0
@@ -59,7 +62,7 @@ class LoadImages:  # for inference
 
         if self.video_flag[self.count]:
             # Read video
-            self.mode = 'video'
+            self.mode = "video"
             ret_val, img0 = self.cap.read()
             if not ret_val:
                 self.count += 1
@@ -73,15 +76,21 @@ class LoadImages:  # for inference
             h0, w0 = img0.shape[:2]
 
             self.frame += 1
-            print('\n video %g/%g (%g/%g) %s: ' % (self.count + 1, self.nf, self.frame, self.nframes, path), end='')
+            print(
+                "\n video %g/%g (%g/%g) %s: "
+                % (self.count + 1, self.nf, self.frame, self.nframes, path),
+                end="",
+            )
 
         else:
             # Read image
             self.count += 1
-            img0 = cv2.imread(path, cv2.IMREAD_COLOR | cv2.IMREAD_IGNORE_ORIENTATION)  # BGR
-            #img0 = cv2.cvtColor(img0, cv2.COLOR_BGR2RGB)
-            assert img0 is not None, 'Image Not Found ' + path
-            print('image %g/%g %s: \n' % (self.count, self.nf, path), end='')
+            img0 = cv2.imread(
+                path, cv2.IMREAD_COLOR | cv2.IMREAD_IGNORE_ORIENTATION
+            )  # BGR
+            # img0 = cv2.cvtColor(img0, cv2.COLOR_BGR2RGB)
+            assert img0 is not None, "Image Not Found " + path
+            print("image %g/%g %s: \n" % (self.count, self.nf, path), end="")
             h0, w0 = img0.shape[:2]
 
         # Padded resize
@@ -90,9 +99,8 @@ class LoadImages:  # for inference
         shapes = (h0, w0), ((h / h0, w / w0), pad)
 
         # Convert
-        #img = img[:, :, ::-1].transpose(2, 0, 1)  # BGR to RGB, to 3x416x416
+        # img = img[:, :, ::-1].transpose(2, 0, 1)  # BGR to RGB, to 3x416x416
         img = np.ascontiguousarray(img)
-
 
         # cv2.imwrite(path + '.letterbox.jpg', 255 * img.transpose((1, 2, 0))[:, :, ::-1])  # save letterbox image
         return path, img, img0, self.cap, shapes
@@ -106,49 +114,75 @@ class LoadImages:  # for inference
         return self.nf  # number of files
 
 
-
 class LoadStreams:  # multiple IP or RTSP cameras
-    def __init__(self, sources='streams.txt', img_size=640, auto=True):
-        self.mode = 'stream'
+    def __init__(self, sources="streams.txt", img_size=640, auto=True):
+        self.mode = "stream"
         self.img_size = img_size
 
         if os.path.isfile(sources):
-            with open(sources, 'r') as f:
-                sources = [x.strip() for x in f.read().strip().splitlines() if len(x.strip())]
+            with open(sources, "r") as f:
+                sources = [
+                    x.strip() for x in f.read().strip().splitlines() if len(x.strip())
+                ]
         else:
             sources = [sources]
 
         n = len(sources)
-        self.imgs, self.fps, self.frames, self.threads = [None] * n, [0] * n, [0] * n, [None] * n
+        self.imgs, self.fps, self.frames, self.threads = (
+            [None] * n,
+            [0] * n,
+            [0] * n,
+            [None] * n,
+        )
         self.sources = [clean_str(x) for x in sources]  # clean source names for later
         self.auto = auto
         for i, s in enumerate(sources):  # index, source
             # Start thread to read frames from video stream
-            print(f'{i + 1}/{n}: {s}... ', end='')
+            print(f"{i + 1}/{n}: {s}... ", end="")
             s = eval(s) if s.isnumeric() else s  # i.e. s = '0' local webcam
             cap = cv2.VideoCapture(s)
-            assert cap.isOpened(), f'Failed to open {s}'
+            assert cap.isOpened(), f"Failed to open {s}"
             w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
             h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-            self.fps[i] = max(cap.get(cv2.CAP_PROP_FPS) % 100, 0) or 30.0  # 30 FPS fallback
-            self.frames[i] = max(int(cap.get(cv2.CAP_PROP_FRAME_COUNT)), 0) or float('inf')  # infinite stream fallback
+            self.fps[i] = (
+                max(cap.get(cv2.CAP_PROP_FPS) % 100, 0) or 30.0
+            )  # 30 FPS fallback
+            self.frames[i] = max(int(cap.get(cv2.CAP_PROP_FRAME_COUNT)), 0) or float(
+                "inf"
+            )  # infinite stream fallback
 
             _, self.imgs[i] = cap.read()  # guarantee first frame
             self.threads[i] = Thread(target=self.update, args=([i, cap]), daemon=True)
-            print(f" success ({self.frames[i]} frames {w}x{h} at {self.fps[i]:.2f} FPS)")
+            print(
+                f" success ({self.frames[i]} frames {w}x{h} at {self.fps[i]:.2f} FPS)"
+            )
             self.threads[i].start()
-        print('')  # newline
+        print("")  # newline
 
         # check for common shapes
 
-        s = np.stack([letterbox_for_img(x, self.img_size, auto=self.auto)[0].shape for x in self.imgs], 0)  # shapes
-        self.rect = np.unique(s, axis=0).shape[0] == 1  # rect inference if all shapes equal
+        s = np.stack(
+            [
+                letterbox_for_img(x, self.img_size, auto=self.auto)[0].shape
+                for x in self.imgs
+            ],
+            0,
+        )  # shapes
+        self.rect = (
+            np.unique(s, axis=0).shape[0] == 1
+        )  # rect inference if all shapes equal
         if not self.rect:
-            print('WARNING: Different stream shapes detected. For optimal performance supply similarly-shaped streams.')
+            print(
+                "WARNING: Different stream shapes detected. For optimal performance supply similarly-shaped streams."
+            )
 
     def update(self, i, cap):
         # Read stream `i` frames in daemon thread
-        n, f, read = 0, self.frames[i], 1  # frame number, frame array, inference every 'read' frame
+        n, f, read = (
+            0,
+            self.frames[i],
+            1,
+        )  # frame number, frame array, inference every 'read' frame
         while cap.isOpened() and n < f:
             n += 1
             # _, self.imgs[index] = cap.read()
@@ -164,7 +198,9 @@ class LoadStreams:  # multiple IP or RTSP cameras
 
     def __next__(self):
         self.count += 1
-        if not all(x.is_alive() for x in self.threads) or cv2.waitKey(1) == ord('q'):  # q to quit
+        if not all(x.is_alive() for x in self.threads) or cv2.waitKey(1) == ord(
+            "q"
+        ):  # q to quit
             cv2.destroyAllWindows()
             raise StopIteration
 
@@ -172,14 +208,16 @@ class LoadStreams:  # multiple IP or RTSP cameras
         img0 = self.imgs.copy()
 
         h0, w0 = img0[0].shape[:2]
-        img, _, pad = letterbox_for_img(img0[0], self.img_size, auto=self.rect and self.auto)
+        img, _, pad = letterbox_for_img(
+            img0[0], self.img_size, auto=self.rect and self.auto
+        )
 
         # Stack
         h, w = img.shape[:2]
         shapes = (h0, w0), ((h / h0, w / w0), pad)
 
         # Convert
-        #img = img[..., ::-1].transpose((0, 3, 1, 2))  # BGR to RGB, BHWC to BCHW
+        # img = img[..., ::-1].transpose((0, 3, 1, 2))  # BGR to RGB, BHWC to BCHW
         img = np.ascontiguousarray(img)
 
         return self.sources, img, img0[0], None, shapes

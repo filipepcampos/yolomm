@@ -10,3 +10,5 @@ inference/
 *.pt
 *.tar
 *.tar.gz
+venv
+sbatch-*

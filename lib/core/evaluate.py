@@ -15,8 +15,16 @@ def fitness(x):
     return (x[:, :4] * w).sum(1)
 
 
-def ap_per_class(tp, conf, pred_cls, target_cls, plot=False, save_dir='precision-recall_curve.png', names=[]):
-    """ Compute the average precision, given the recall and precision curves.
+def ap_per_class(
+    tp,
+    conf,
+    pred_cls,
+    target_cls,
+    plot=False,
+    save_dir="precision-recall_curve.png",
+    names=[],
+):
+    """Compute the average precision, given the recall and precision curves.
     Source: https://github.com/rafaelpadilla/Object-Detection-Metrics.
     # Arguments
         tp:  True positives (nparray, nx1 or nx10).
@@ -39,8 +47,15 @@ def ap_per_class(tp, conf, pred_cls, target_cls, plot=False, save_dir='precision
     # Create Precision-Recall curve and compute AP for each class
     px, py = np.linspace(0, 1, 1000), []  # for plotting
     pr_score = 0.1  # score to evaluate P and R https://github.com/ultralytics/yolov3/issues/898
-    s = [unique_classes.shape[0], tp.shape[1]]  # number class, number iou thresholds (i.e. 10 for mAP0.5...0.95)
-    ap, p, r = np.zeros(s), np.zeros((unique_classes.shape[0], 1000)), np.zeros((unique_classes.shape[0], 1000))
+    s = [
+        unique_classes.shape[0],
+        tp.shape[1],
+    ]  # number class, number iou thresholds (i.e. 10 for mAP0.5...0.95)
+    ap, p, r = (
+        np.zeros(s),
+        np.zeros((unique_classes.shape[0], 1000)),
+        np.zeros((unique_classes.shape[0], 1000)),
+    )
     for ci, c in enumerate(unique_classes):
         i = pred_cls == c
         n_l = (target_cls == c).sum()  # number of labels
@@ -55,7 +70,9 @@ def ap_per_class(tp, conf, pred_cls, target_cls, plot=False, save_dir='precision
 
             # Recall
             recall = tpc / (n_l + 1e-16)  # recall curve
-            r[ci] = np.interp(-px, -conf[i], recall[:, 0], left=0)  # r at pr_score, negative x, xp because xp decreases
+            r[ci] = np.interp(
+                -px, -conf[i], recall[:, 0], left=0
+            )  # r at pr_score, negative x, xp because xp decreases
 
             # Precision
             precision = tpc / (tpc + fpc)  # precision curve
@@ -74,11 +91,11 @@ def ap_per_class(tp, conf, pred_cls, target_cls, plot=False, save_dir='precision
     if plot:
         plot_pr_curve(px, py, ap, save_dir, names)
 
-    return p[:, i], r[:, i], ap, f1, unique_classes.astype('int32')
+    return p[:, i], r[:, i], ap, f1, unique_classes.astype("int32")
 
 
 def compute_ap(recall, precision):
-    """ Compute the average precision, given the recall and precision curves
+    """Compute the average precision, given the recall and precision curves
     # Arguments
         recall:    The recall curve (list)
         precision: The precision curve (list)
@@ -87,15 +104,15 @@ def compute_ap(recall, precision):
     """
 
     # Append sentinel values to beginning and end
-    mrec = np.concatenate(([0.], recall, [recall[-1] + 0.01]))
-    mpre = np.concatenate(([1.], precision, [0.]))
+    mrec = np.concatenate(([0.0], recall, [recall[-1] + 0.01]))
+    mpre = np.concatenate(([1.0], precision, [0.0]))
 
     # Compute the precision envelope
     mpre = np.flip(np.maximum.accumulate(np.flip(mpre)))
 
     # Integrate area under curve
-    method = 'interp'  # methods: 'continuous', 'interp'
-    if method == 'interp':
+    method = "interp"  # methods: 'continuous', 'interp'
+    if method == "interp":
         x = np.linspace(0, 1, 101)  # 101-point interp (COCO)
         ap = np.trapz(np.interp(x, mrec, mpre), x)  # integrate
     else:  # 'continuous'
@@ -130,7 +147,11 @@ class ConfusionMatrix:
 
         x = torch.where(iou > self.iou_thres)
         if x[0].shape[0]:
-            matches = torch.cat((torch.stack(x, 1), iou[x[0], x[1]][:, None]), 1).cpu().numpy()
+            matches = (
+                torch.cat((torch.stack(x, 1), iou[x[0], x[1]][:, None]), 1)
+                .cpu()
+                .numpy()
+            )
             if x[0].shape[0] > 1:
                 matches = matches[matches[:, 2].argsort()[::-1]]
                 matches = matches[np.unique(matches[:, 1], return_index=True)[1]]
@@ -156,45 +177,58 @@ class ConfusionMatrix:
     def matrix(self):
         return self.matrix
 
-    def plot(self, save_dir='', names=()):
+    def plot(self, save_dir="", names=()):
         try:
             import seaborn as sn
 
-            array = self.matrix / (self.matrix.sum(0).reshape(1, self.nc + 1) + 1E-6)  # normalize
+            array = self.matrix / (
+                self.matrix.sum(0).reshape(1, self.nc + 1) + 1e-6
+            )  # normalize
             array[array < 0.005] = np.nan  # don't annotate (would appear as 0.00)
 
             fig = plt.figure(figsize=(12, 9), tight_layout=True)
             sn.set(font_scale=1.0 if self.nc < 50 else 0.8)  # for label size
-            labels = (0 < len(names) < 99) and len(names) == self.nc  # apply names to ticklabels
-            sn.heatmap(array, annot=self.nc < 30, annot_kws={"size": 8}, cmap='Blues', fmt='.2f', square=True,
-                       xticklabels=names + ['background FN'] if labels else "auto",
-                       yticklabels=names + ['background FP'] if labels else "auto").set_facecolor((1, 1, 1))
-            fig.axes[0].set_xlabel('True')
-            fig.axes[0].set_ylabel('Predicted')
-            fig.savefig(Path(save_dir) / 'confusion_matrix.png', dpi=250)
+            labels = (0 < len(names) < 99) and len(
+                names
+            ) == self.nc  # apply names to ticklabels
+            sn.heatmap(
+                array,
+                annot=self.nc < 30,
+                annot_kws={"size": 8},
+                cmap="Blues",
+                fmt=".2f",
+                square=True,
+                xticklabels=names + ["background FN"] if labels else "auto",
+                yticklabels=names + ["background FP"] if labels else "auto",
+            ).set_facecolor((1, 1, 1))
+            fig.axes[0].set_xlabel("True")
+            fig.axes[0].set_ylabel("Predicted")
+            fig.savefig(Path(save_dir) / "confusion_matrix.png", dpi=250)
         except Exception as e:
             pass
 
     def print(self):
         for i in range(self.nc + 1):
-            print(' '.join(map(str, self.matrix[i])))
+            print(" ".join(map(str, self.matrix[i])))
+
 
 class SegmentationMetric(object):
-    '''
+    """
     imgLabel [batch_size, height(144), width(256)]
     confusionMatrix [[0(TN),1(FP)],
                      [2(FN),3(TP)]]
-    '''
+    """
+
     def __init__(self, numClass):
         self.numClass = numClass
-        self.confusionMatrix = np.zeros((self.numClass,)*2)
+        self.confusionMatrix = np.zeros((self.numClass,) * 2)
 
     def pixelAccuracy(self):
         # return all class overall pixel accuracy
         # acc = (TP + TN) / (TP + TN + FP + TN)
-        acc = np.diag(self.confusionMatrix).sum() /  self.confusionMatrix.sum()
+        acc = np.diag(self.confusionMatrix).sum() / self.confusionMatrix.sum()
         return acc
-        
+
     def lineAccuracy(self):
         Acc = np.diag(self.confusionMatrix) / (self.confusionMatrix.sum(axis=1) + 1e-12)
         return Acc[1]
@@ -202,7 +236,9 @@ class SegmentationMetric(object):
     def classPixelAccuracy(self):
         # return each category pixel accuracy(A more accurate way to call it precision)
         # acc = (TP) / TP + FP
-        classAcc = np.diag(self.confusionMatrix) / (self.confusionMatrix.sum(axis=0) + 1e-12)
+        classAcc = np.diag(self.confusionMatrix) / (
+            self.confusionMatrix.sum(axis=0) + 1e-12
+        )
         return classAcc
 
     def meanPixelAccuracy(self):
@@ -214,15 +250,23 @@ class SegmentationMetric(object):
         # Intersection = TP Union = TP + FP + FN
         # IoU = TP / (TP + FP + FN)
         intersection = np.diag(self.confusionMatrix)
-        union = np.sum(self.confusionMatrix, axis=1) + np.sum(self.confusionMatrix, axis=0) - np.diag(self.confusionMatrix)
+        union = (
+            np.sum(self.confusionMatrix, axis=1)
+            + np.sum(self.confusionMatrix, axis=0)
+            - np.diag(self.confusionMatrix)
+        )
         IoU = intersection / union
         IoU[np.isnan(IoU)] = 0
         mIoU = np.nanmean(IoU)
         return mIoU
-    
+
     def IntersectionOverUnion(self):
         intersection = np.diag(self.confusionMatrix)
-        union = np.sum(self.confusionMatrix, axis=1) + np.sum(self.confusionMatrix, axis=0) - np.diag(self.confusionMatrix)
+        union = (
+            np.sum(self.confusionMatrix, axis=1)
+            + np.sum(self.confusionMatrix, axis=0)
+            - np.diag(self.confusionMatrix)
+        )
         IoU = intersection / union
         IoU[np.isnan(IoU)] = 0
         return IoU[1]
@@ -240,11 +284,12 @@ class SegmentationMetric(object):
         # FWIOU =     [(TP+FN)/(TP+FP+TN+FN)] *[TP / (TP + FP + FN)]
         freq = np.sum(self.confusionMatrix, axis=1) / np.sum(self.confusionMatrix)
         iu = np.diag(self.confusionMatrix) / (
-                np.sum(self.confusionMatrix, axis=1) + np.sum(self.confusionMatrix, axis=0) -
-                np.diag(self.confusionMatrix))
+            np.sum(self.confusionMatrix, axis=1)
+            + np.sum(self.confusionMatrix, axis=0)
+            - np.diag(self.confusionMatrix)
+        )
         FWIoU = (freq[freq > 0] * iu[freq > 0]).sum()
         return FWIoU
-
 
     def addBatch(self, imgPredict, imgLabel):
         assert imgPredict.shape == imgLabel.shape
@@ -254,25 +299,31 @@ class SegmentationMetric(object):
         self.confusionMatrix = np.zeros((self.numClass, self.numClass))
 
 
-
-
-
 # Plots ----------------------------------------------------------------------------------------------------------------
 
-def plot_pr_curve(px, py, ap, save_dir='.', names=()):
+
+def plot_pr_curve(px, py, ap, save_dir=".", names=()):
     fig, ax = plt.subplots(1, 1, figsize=(9, 6), tight_layout=True)
     py = np.stack(py, axis=1)
 
     if 0 < len(names) < 21:  # show mAP in legend if < 10 classes
         for i, y in enumerate(py.T):
-            ax.plot(px, y, linewidth=1, label=f'{names[i]} %.3f' % ap[i, 0])  # plot(recall, precision)
+            ax.plot(
+                px, y, linewidth=1, label=f"{names[i]} %.3f" % ap[i, 0]
+            )  # plot(recall, precision)
     else:
-        ax.plot(px, py, linewidth=1, color='grey')  # plot(recall, precision)
+        ax.plot(px, py, linewidth=1, color="grey")  # plot(recall, precision)
 
-    ax.plot(px, py.mean(1), linewidth=3, color='blue', label='all classes %.3f mAP@0.5' % ap[:, 0].mean())
-    ax.set_xlabel('Recall')
-    ax.set_ylabel('Precision')
+    ax.plot(
+        px,
+        py.mean(1),
+        linewidth=3,
+        color="blue",
+        label="all classes %.3f mAP@0.5" % ap[:, 0].mean(),
+    )
+    ax.set_xlabel("Recall")
+    ax.set_ylabel("Precision")
     ax.set_xlim(0, 1)
     ax.set_ylim(0, 1)
     plt.legend(bbox_to_anchor=(1.04, 1), loc="upper left")
-    fig.savefig(Path(save_dir) / 'precision_recall_curve.png', dpi=250)
+    fig.savefig(Path(save_dir) / "precision_recall_curve.png", dpi=250)

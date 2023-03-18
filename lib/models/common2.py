@@ -17,20 +17,28 @@ class DepthSeperabelConv2d(nn.Module):
     DepthSeperable Convolution 2d with residual connection
     """
 
-    def __init__(self, inplanes, planes, kernel_size=3, stride=1, downsample=None, act=True):
+    def __init__(
+        self, inplanes, planes, kernel_size=3, stride=1, downsample=None, act=True
+    ):
         super(DepthSeperabelConv2d, self).__init__()
         self.depthwise = nn.Sequential(
-            nn.Conv2d(inplanes, inplanes, kernel_size, stride=stride, groups=inplanes, padding=kernel_size // 2,
-                      bias=False),
-            nn.BatchNorm2d(inplanes)
+            nn.Conv2d(
+                inplanes,
+                inplanes,
+                kernel_size,
+                stride=stride,
+                groups=inplanes,
+                padding=kernel_size // 2,
+                bias=False,
+            ),
+            nn.BatchNorm2d(inplanes),
         )
         # self.depthwise = nn.Conv2d(inplanes, inplanes, kernel_size,
         # stride=stride, groups=inplanes, padding=1, bias=False)
         # self.pointwise = nn.Conv2d(inplanes, planes, 1, bias=False)
 
         self.pointwise = nn.Sequential(
-            nn.Conv2d(inplanes, planes, 1, bias=False),
-            nn.BatchNorm2d(planes)
+            nn.Conv2d(inplanes, planes, 1, bias=False), nn.BatchNorm2d(planes)
         )
         self.downsample = downsample
         self.stride = stride
@@ -55,9 +63,13 @@ class DepthSeperabelConv2d(nn.Module):
 
 class SharpenConv(nn.Module):
     # SharpenConv convolution
-    def __init__(self, c1, c2, k=3, s=1, p=None, g=1, act=True):  # ch_in, ch_out, kernel, stride, padding, groups
+    def __init__(
+        self, c1, c2, k=3, s=1, p=None, g=1, act=True
+    ):  # ch_in, ch_out, kernel, stride, padding, groups
         super(SharpenConv, self).__init__()
-        sobel_kernel = np.array([[-1, -1, -1], [-1, 8, -1], [-1, -1, -1]], dtype='float32')
+        sobel_kernel = np.array(
+            [[-1, -1, -1], [-1, 8, -1], [-1, -1, -1]], dtype="float32"
+        )
         kenel_weight = np.vstack([sobel_kernel] * c2 * c1).reshape(c2, c1, 3, 3)
         self.conv = nn.Conv2d(c1, c2, k, s, autopad(k, p), groups=g, bias=False)
         self.conv.weight.data = torch.from_numpy(kenel_weight)
@@ -77,7 +89,9 @@ class SharpenConv(nn.Module):
 
 class Conv(nn.Module):
     # Standard convolution
-    def __init__(self, c1, c2, k=1, s=1, p=None, g=1, act=True):  # ch_in, ch_out, kernel, stride, padding, groups
+    def __init__(
+        self, c1, c2, k=1, s=1, p=None, g=1, act=True
+    ):  # ch_in, ch_out, kernel, stride, padding, groups
         super(Conv, self).__init__()
         self.conv = nn.Conv2d(c1, c2, k, s, autopad(k, p), groups=g, bias=False)
         self.bn = nn.BatchNorm2d(c2)
@@ -95,7 +109,9 @@ class Conv(nn.Module):
 
 class Bottleneck(nn.Module):
     # Standard bottleneck
-    def __init__(self, c1, c2, shortcut=True, g=1, e=0.5):  # ch_in, ch_out, shortcut, groups, expansion
+    def __init__(
+        self, c1, c2, shortcut=True, g=1, e=0.5
+    ):  # ch_in, ch_out, shortcut, groups, expansion
         super(Bottleneck, self).__init__()
         c_ = int(c2 * e)  # hidden channels
         self.cv1 = Conv(c1, c_, 1, 1)
@@ -108,7 +124,9 @@ class Bottleneck(nn.Module):
 
 class BottleneckCSP(nn.Module):
     # CSP Bottleneck https://github.com/WongKinYiu/CrossStagePartialNetworks
-    def __init__(self, c1, c2, n=1, shortcut=True, g=1, e=0.5):  # ch_in, ch_out, number, shortcut, groups, expansion
+    def __init__(
+        self, c1, c2, n=1, shortcut=True, g=1, e=0.5
+    ):  # ch_in, ch_out, number, shortcut, groups, expansion
         super(BottleneckCSP, self).__init__()
         c_ = int(c2 * e)  # hidden channels
         self.cv1 = Conv(c1, c_, 1, 1)
@@ -117,7 +135,9 @@ class BottleneckCSP(nn.Module):
         self.cv4 = Conv(2 * c_, c2, 1, 1)
         self.bn = nn.BatchNorm2d(2 * c_)  # applied to cat(cv2, cv3)
         self.act = nn.LeakyReLU(0.1, inplace=True)
-        self.m = nn.Sequential(*[Bottleneck(c_, c_, shortcut, g, e=1.0) for _ in range(n)])
+        self.m = nn.Sequential(
+            *[Bottleneck(c_, c_, shortcut, g, e=1.0) for _ in range(n)]
+        )
 
     def forward(self, x):
         y1 = self.cv3(self.m(self.cv1(x)))
@@ -132,7 +152,9 @@ class SPP(nn.Module):
         c_ = c1 // 2  # hidden channels
         self.cv1 = Conv(c1, c_, 1, 1)
         self.cv2 = Conv(c_ * (len(k) + 1), c2, 1, 1)
-        self.m = nn.ModuleList([nn.MaxPool2d(kernel_size=x, stride=1, padding=x // 2) for x in k])
+        self.m = nn.ModuleList(
+            [nn.MaxPool2d(kernel_size=x, stride=1, padding=x // 2) for x in k]
+        )
 
     def forward(self, x):
         x = self.cv1(x)
@@ -146,7 +168,12 @@ class Contract(nn.Module):
         self.gain = gain
 
     def forward(self, x):
-        N, C, H, W = x.size()  # assert (H / s == 0) and (W / s == 0), 'Indivisible gain'
+        (
+            N,
+            C,
+            H,
+            W,
+        ) = x.size()  # assert (H / s == 0) and (W / s == 0), 'Indivisible gain'
         s = self.gain
         x = x.view(N, C, H // s, s, W // s, s)  # x(1,64,40,2,40,2)
         x = x.permute(0, 3, 5, 1, 2, 4).contiguous()  # x(1,2,2,64,40,40)
@@ -156,13 +183,25 @@ class Contract(nn.Module):
 class Focus(nn.Module):
     # Focus wh information into c-space
     # slice concat conv
-    def __init__(self, c1, c2, k=1, s=1, p=None, g=1, act=True):  # ch_in, ch_out, kernel, stride, padding, groups
+    def __init__(
+        self, c1, c2, k=1, s=1, p=None, g=1, act=True
+    ):  # ch_in, ch_out, kernel, stride, padding, groups
         super(Focus, self).__init__()
         self.conv = Conv(c1 * 4, c2, k, s, p, g, act)
         self.contract = Contract(gain=2)
 
     def forward(self, x):  # x(b,c,w,h) -> y(b,4c,w/2,h/2)
-        return self.conv(torch.cat([x[..., ::2, ::2], x[..., 1::2, ::2], x[..., ::2, 1::2], x[..., 1::2, 1::2]], 1))
+        return self.conv(
+            torch.cat(
+                [
+                    x[..., ::2, ::2],
+                    x[..., 1::2, ::2],
+                    x[..., ::2, 1::2],
+                    x[..., 1::2, 1::2],
+                ],
+                1,
+            )
+        )
         # return self.conv(self.contract(x))
 
 
@@ -173,9 +212,9 @@ class Concat(nn.Module):
         self.d = dimension
 
     def forward(self, x):
-        """ print("***********************")
+        """print("***********************")
         for f in x:
-            print(f.shape) """
+            print(f.shape)"""
         return torch.cat(x, self.d)
 
 
@@ -190,9 +229,13 @@ class Detect(nn.Module):
         self.na = len(anchors[0]) // 2  # number of anchors 3
         self.grid = [torch.zeros(1)] * self.nl  # init grid
         a = torch.tensor(anchors).float().view(self.nl, -1, 2)  # (nl=3,na=3,2)
-        self.register_buffer('anchors', a)  # shape(nl,na,2)
-        self.register_buffer('anchor_grid', a.clone().view(self.nl, 1, -1, 1, 1, 2))  # shape(nl=3,1,na=3,1,1,2)
-        self.m = nn.ModuleList(nn.Conv2d(x, self.no * self.na, 1) for x in ch)  # output conv
+        self.register_buffer("anchors", a)  # shape(nl,na,2)
+        self.register_buffer(
+            "anchor_grid", a.clone().view(self.nl, 1, -1, 1, 1, 2)
+        )  # shape(nl=3,1,na=3,1,1,2)
+        self.m = nn.ModuleList(
+            nn.Conv2d(x, self.no * self.na, 1) for x in ch
+        )  # output conv
         self.inplace = True  # use in-place ops (e.g. slice assignment)
 
     # def forward(self, x):
@@ -227,7 +270,12 @@ class Detect(nn.Module):
 
             # x(bs,255,20,20) to x(bs,3,20,20,nc+5) (bs,na,ny,nx,no=nc+5=4+1+nc)
 
-            x[i] = x[i].view(bs, self.na, self.no, ny, nx).permute(0, 1, 3, 4, 2).contiguous()
+            x[i] = (
+                x[i]
+                .view(bs, self.na, self.no, ny, nx)
+                .permute(0, 1, 3, 4, 2)
+                .contiguous()
+            )
 
             if not self.training:  # inference
                 # if self.grid[i].shape[2:4] != x[i].shape[2:4] or self.onnx_dynamic:
@@ -237,18 +285,25 @@ class Detect(nn.Module):
 
                 y = x[i].sigmoid()  # (bs,na,ny,nx,no=nc+5=4+1+nc)
 
-                xy = (y[..., 0:2] * 2. - 0.5 + self.grid[i]) * self.stride[i]  # xy (bs,na,ny,nx,2)
-                wh = (y[..., 2:4] * 2) ** 2 * self.anchor_grid[i].view(1, self.na, 1, 1, 2)  # wh (bs,na,ny,nx,2)
-                y = torch.cat((xy, wh, y[..., 4:]), -1) # (bs,na,ny,nx,2+2+1+nc=xy+wh+conf+cls_prob)
+                xy = (y[..., 0:2] * 2.0 - 0.5 + self.grid[i]) * self.stride[
+                    i
+                ]  # xy (bs,na,ny,nx,2)
+                wh = (y[..., 2:4] * 2) ** 2 * self.anchor_grid[i].view(
+                    1, self.na, 1, 1, 2
+                )  # wh (bs,na,ny,nx,2)
+                y = torch.cat(
+                    (xy, wh, y[..., 4:]), -1
+                )  # (bs,na,ny,nx,2+2+1+nc=xy+wh+conf+cls_prob)
 
-                z.append(y.view(bs, -1, self.no))  # y (bs,na*ny*nx,no=2+2+1+nc=xy+wh+conf+cls_prob)
+                z.append(
+                    y.view(bs, -1, self.no)
+                )  # y (bs,na*ny*nx,no=2+2+1+nc=xy+wh+conf+cls_prob)
 
         return x if self.training else (torch.cat(z, 1), x)
         # torch.cat(z, 1) (bs,na*ny*nx*nl,no=2+2+1+nc=xy+wh+conf+cls_prob)
 
     @staticmethod
     def _make_grid(nx=20, ny=20):
-
         yv, xv = torch.meshgrid([torch.arange(ny), torch.arange(nx)])
         return torch.stack((xv, yv), 2).view((1, 1, ny, nx, 2)).float()
 
