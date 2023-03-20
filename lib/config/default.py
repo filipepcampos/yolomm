@@ -54,12 +54,22 @@ _C.DATASET = CN(new_allowed=True)
 # _C.DATASET.LABELROOT = '/home/up201905609/bdd100k/det_annotations'      # the path of det_annotations folder
 # _C.DATASET.MASKROOT = '/home/up201905609/bdd100k/bdd_seg_gt'                # the path of da_seg_annotations folder
 # _C.DATASET.LANEROOT = '/home/up201905609/bdd100k/bdd_lane_gt'               # the path of ll_seg_annotations folder
+# _C.DATASET.DATASET = "BddDataset"
+# _C.DATASET.TRAIN_SET = "train"
+# _C.DATASET.TEST_SET = "val"
+# _C.DATASET.DATA_FORMAT = "jpg"
+# _C.DATASET.SELECT_DATA = False
+# _C.DATASET.ORG_IMG_SIZE = [720, 1280]
+_C.DATASET.DATAROOT = '/data/auto/kitti/object'       # the path of images folder
+_C.DATASET.LABELROOT = '/data/auto/kitti/object'     # the path of det_annotations folder
+_C.DATASET.MASKROOT = '/data/auto/kitti/semantics'                # the path of da_seg_annotations folder
+_C.DATASET.LANEROOT = '/data/auto/kitti/object/training/semantic'               # the path of ll_seg_annotations folder
 _C.DATASET.DATASET = "BddDataset"
 _C.DATASET.TRAIN_SET = "train"
 _C.DATASET.TEST_SET = "val"
-_C.DATASET.DATA_FORMAT = "jpg"
+_C.DATASET.DATA_FORMAT = "png"
 _C.DATASET.SELECT_DATA = False
-_C.DATASET.ORG_IMG_SIZE = [720, 1280]
+_C.DATASET.ORG_IMG_SIZE = [512, 1382]
 
 # training data augmentation
 _C.DATASET.FLIP = True
