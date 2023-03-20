@@ -358,8 +358,6 @@ def main():
             )
             logger.info(str(det.anchors))
 
-    print("SURVIVED :D")
-
     # training
     num_warmup = max(round(cfg.TRAIN.WARMUP_EPOCHS * num_batch), 1000)
     scaler = amp.GradScaler(enabled=device.type != "cpu")
