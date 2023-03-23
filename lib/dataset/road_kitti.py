@@ -200,9 +200,7 @@ class KITTIRoadDataset(Dataset):
             label_seg.append(l)
         return (
             torch.stack(img, 0),
-            [
-                torch.stack(label_seg, 0)
-            ],
+            [torch.stack(label_seg, 0)],
             paths,
             shapes,
         )
