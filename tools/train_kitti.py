@@ -24,9 +24,9 @@ from tensorboardX import SummaryWriter
 import lib.dataset as dataset
 from lib.config import cfg
 from lib.config import update_config
-from lib.core.loss import get_loss
+from lib.core.loss import get_kitti_loss
 from lib.core.function import train
-from lib.core.function import validate
+from lib.core.function import validate_kitti
 from lib.core.general import fitness
 from lib.models import get_net
 from lib.utils import is_parallel
@@ -131,7 +131,7 @@ def main():
     # print("finish build model")
 
     # define loss function (criterion) and optimizer
-    criterion = get_loss(cfg, device=device)
+    criterion = get_kitti_loss(cfg, device=device)
     optimizer = get_optimizer(cfg, model)
 
     # load checkpoint model
@@ -307,7 +307,9 @@ def main():
     )
 
     TRAIN_SIZE = 0.8
-    train_dataset = torch.utils.data.Subset(dataset, range(0, int(TRAIN_SIZE*len(dataset))))
+    train_dataset = torch.utils.data.Subset(
+        dataset, range(0, int(TRAIN_SIZE * len(dataset)))
+    )
 
     train_sampler = (
         torch.utils.data.distributed.DistributedSampler(train_dataset)
@@ -327,7 +329,9 @@ def main():
     num_batch = len(train_loader)
 
     if rank in [-1, 0]:
-        valid_dataset = torch.utils.data.Subset(dataset, range(int(TRAIN_SIZE*len(dataset)), len(dataset)))
+        valid_dataset = torch.utils.data.Subset(
+            dataset, range(int(TRAIN_SIZE * len(dataset)), len(dataset))
+        )
 
         valid_loader = DataLoaderX(
             valid_dataset,
@@ -384,6 +388,7 @@ def main():
 
         lr_scheduler.step()
 
+        # TODO: Adapt validation for kitti
         # evaluate on validation set
         if (
             epoch % cfg.TRAIN.VAL_FREQ == 0 or epoch == cfg.TRAIN.END_EPOCH
@@ -396,7 +401,7 @@ def main():
                 total_loss,
                 maps,
                 times,
-            ) = validate(
+            ) = validate_kitti(
                 epoch,
                 cfg,
                 valid_loader,
@@ -436,11 +441,11 @@ def main():
             )
             logger.info(msg)
 
-            # if perf_indicator >= best_perf:
-            #     best_perf = perf_indicator
-            #     best_model = True
-            # else:
-            #     best_model = False
+        # if perf_indicator >= best_perf:
+        #     best_perf = perf_indicator
+        #     best_model = True
+        # else:
+        #     best_model = False
 
         # save checkpoint model and best model
         if rank in [-1, 0]:

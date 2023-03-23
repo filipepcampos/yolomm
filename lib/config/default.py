@@ -60,10 +60,9 @@ _C.DATASET = CN(new_allowed=True)
 # _C.DATASET.DATA_FORMAT = "jpg"
 # _C.DATASET.SELECT_DATA = False
 # _C.DATASET.ORG_IMG_SIZE = [720, 1280]
-_C.DATASET.DATAROOT = '/data/auto/kitti/object'       # the path of images folder
-_C.DATASET.LABELROOT = '/data/auto/kitti/object'     # the path of det_annotations folder
-_C.DATASET.MASKROOT = '/data/auto/kitti/semantics'                # the path of da_seg_annotations folder
-_C.DATASET.LANEROOT = '/data/auto/kitti/object/training/semantic'               # the path of ll_seg_annotations folder
+_C.DATASET.DATAROOT = "/data/auto/kitti/object"  # the path of images folder
+_C.DATASET.LABELROOT = "/data/auto/kitti/object"  # the path of det_annotations folder
+_C.DATASET.ROAD_ROOT = "/data/auto/kitti/road/data_road"
 _C.DATASET.DATASET = "KITTIDataset"
 _C.DATASET.TRAIN_SET = "training"
 _C.DATASET.TEST_SET = "testing"
