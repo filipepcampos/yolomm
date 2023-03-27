@@ -105,7 +105,7 @@ class KITTIDataset(Dataset):
                 w = right - left
                 h = bottom - top
 
-                bbox = [center_x // width, center_y // height, w // width, h // height]
+                bbox = [center_x / width, center_y / height, w / width, h / height]
                 gt[idx][0] = cls_id
                 gt[idx][1:] = bbox
 
@@ -242,3 +242,4 @@ class KITTIDataset(Dataset):
 
 if __name__ == "__main__":
     dataset = KITTIDataset(cfg, True)
+    print(dataset[0][1])
