@@ -227,16 +227,6 @@ class KITTIMultiHeadLoss(nn.Module):
         - head_losses: (tuple) contain all loss[loss1, loss2, ...]
 
         """
-        # head_losses = [ll
-        #                 for l, f, t in zip(self.losses, head_fields, head_targets)
-        #                 for ll in l(f, t)]
-        #
-        # assert len(self.lambdas) == len(head_losses)
-        # loss_values = [lam * l
-        #                for lam, l in zip(self.lambdas, head_losses)
-        #                if l is not None]
-        # total_loss = sum(loss_values) if loss_values else None
-        # print(model.nc)
         total_loss, head_losses = self._forward_impl(
             head_fields, head_targets, shapes, model
         )
@@ -328,6 +318,99 @@ class KITTIMultiHeadLoss(nn.Module):
         )
 
 
+class KITTIDaHeadLoss(nn.Module):
+    """
+    collect all the loss we need
+    """
+
+    def __init__(self, losses, cfg, lambdas=None):
+        """
+        Inputs:
+        - losses: (list)[nn.Module, nn.Module, ...]
+        - cfg: config object
+        - lambdas: (list) + IoU loss, weight for each loss
+        """
+        super().__init__()
+        # lambdas: [cls, obj, iou, la_seg, ll_seg, ll_iou]
+        if not lambdas:
+            lambdas = [1.0 for _ in range(len(losses) + 3)]
+        assert all(lam >= 0.0 for lam in lambdas)
+
+        self.losses = nn.ModuleList(losses)
+        self.lambdas = lambdas
+        self.cfg = cfg
+
+    def forward(self, head_fields, head_targets, shapes, model):
+        """
+        Inputs:
+        - head_fields: (list) output from each task head
+        - head_targets: (list) ground-truth for each task head
+        - model:
+
+        Returns:
+        - total_loss: sum of all the loss
+        - head_losses: (tuple) contain all loss[loss1, loss2, ...]
+
+        """
+        total_loss, head_losses = self._forward_impl(
+            head_fields, head_targets, shapes, model
+        )
+
+        return total_loss, head_losses
+
+    def _forward_impl(self, predictions, targets, shapes, model):
+        """
+
+        Args:
+            predictions: predicts of [[det_head1, det_head2, det_head3], drive_area_seg_head, lane_line_seg_head]
+            targets: gts [det_targets, segment_targets, lane_targets]
+            model:
+
+        Returns:
+            total_loss: sum of all the loss
+            head_losses: list containing losses
+
+        """
+        cfg = self.cfg
+        device = targets[0].device
+        
+        # Class label smoothing https://arxiv.org/pdf/1902.04103.pdf eqn 3
+        cp, cn = smooth_BCE(eps=0.0)
+
+        BCEseg = self.losses[0]
+
+        # Calculate Losses
+        nt = 0  # number of targets
+        no = len(predictions[0])  # number of outputs
+
+        drive_area_seg_predicts = predictions[1].view(-1)
+        drive_area_seg_targets = targets[0].view(-1)
+        lseg_da = BCEseg(drive_area_seg_predicts, drive_area_seg_targets)
+
+
+        metric = SegmentationMetric(2)
+        pad_w, pad_h = shapes[0][1][1]
+        pad_w = int(pad_w)
+        pad_h = int(pad_h)
+        metric.reset()
+        IoU = metric.IntersectionOverUnion()
+
+        s = 3 / no  # output count scaling
+
+        lseg_da *= cfg.LOSS.DA_SEG_GAIN * self.lambdas[3]
+
+        if cfg.TRAIN.DET_ONLY or cfg.TRAIN.ENC_DET_ONLY or cfg.TRAIN.DET_ONLY:
+            lseg_da = 0 * lseg_da
+
+        if cfg.TRAIN.LANE_ONLY:
+            lseg_da = 0 * lseg_da
+
+        loss = lseg_da
+
+        return loss, (
+            lseg_da.item()
+        )
+
 def get_kitti_loss(cfg, device):
     BCEcls = nn.BCEWithLogitsLoss(
         pos_weight=torch.Tensor([cfg.LOSS.CLS_POS_WEIGHT])
@@ -343,6 +426,16 @@ def get_kitti_loss(cfg, device):
 
     loss_list = [BCEcls, BCEobj]
     loss = KITTIMultiHeadLoss(loss_list, cfg=cfg, lambdas=cfg.LOSS.MULTI_HEAD_LAMBDA)
+    return loss
+
+def get_kitti_da_loss(cfg, device):
+    # segmentation loss criteria
+    BCEseg = nn.BCEWithLogitsLoss(
+        pos_weight=torch.Tensor([cfg.LOSS.SEG_POS_WEIGHT])
+    ).to(device)
+
+    loss_list = [BCEseg]
+    loss = KITTIDaHeadLoss(loss_list, cfg=cfg, lambdas=cfg.LOSS.MULTI_HEAD_LAMBDA)
     return loss
 
 

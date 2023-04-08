@@ -63,7 +63,7 @@ _C.DATASET = CN(new_allowed=True)
 _C.DATASET.DATAROOT = "/data/auto/kitti/object"  # the path of images folder
 _C.DATASET.LABELROOT = "/data/auto/kitti/object"  # the path of det_annotations folder
 _C.DATASET.ROAD_ROOT = "/data/auto/kitti/road/data_road"
-_C.DATASET.DATASET = "KITTIDataset"
+_C.DATASET.DATASET = "KITTIRoadDataset"
 _C.DATASET.TRAIN_SET = "training"
 _C.DATASET.TEST_SET = "testing"
 _C.DATASET.DATA_FORMAT = "png"
