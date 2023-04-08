@@ -856,7 +856,7 @@ def validate_road_kitti(
 
             # driving area segment evaluation
             _, da_predict = torch.max(da_seg_out, 1)
-            _, da_gt = torch.max(target[1], 1)
+            _, da_gt = torch.max(target[0], 1)
             da_predict = da_predict[:, pad_h : height - pad_h, pad_w : width - pad_w]
             da_gt = da_gt[:, pad_h : height - pad_h, pad_w : width - pad_w]
 
