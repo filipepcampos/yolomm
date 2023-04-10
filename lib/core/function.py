@@ -877,20 +877,20 @@ def validate_road_kitti(
 
             # NMS
             t = time_synchronized()
-            target[0][:, 2:] *= torch.Tensor([width, height, width, height]).to(
-                device
-            )  # to pixels
-            lb = (
-                [target[0][target[0][:, 0] == i, 1:] for i in range(nb)]
-                if save_hybrid
-                else []
-            )  # for autolabelling
-            output = non_max_suppression(
-                inf_out,
-                conf_thres=config.TEST.NMS_CONF_THRESHOLD,
-                iou_thres=config.TEST.NMS_IOU_THRESHOLD,
-                labels=lb,
-            )
+            #target[0][:, 2:] *= torch.Tensor([width, height, width, height]).to(
+            #    device
+            #)  # to pixels
+            #lb = (
+            #    [target[0][target[0][:, 0] == i, 1:] for i in range(nb)]
+            #    if save_hybrid
+            #    else []
+            #)  # for autolabelling
+            #output = non_max_suppression(
+            #    inf_out,
+            #    conf_thres=config.TEST.NMS_CONF_THRESHOLD,
+            #    iou_thres=config.TEST.NMS_IOU_THRESHOLD,
+            #    labels=lb,
+            #)
             # output = non_max_suppression(inf_out, conf_thres=0.001, iou_thres=0.6)
             # output = non_max_suppression(inf_out, conf_thres=config.TEST.NMS_CONF_THRES, iou_thres=config.TEST.NMS_IOU_THRES)
             t_nms = time_synchronized() - t
@@ -908,7 +908,7 @@ def validate_road_kitti(
                         )
                         _, da_seg_mask = torch.max(da_seg_mask, 1)
 
-                        da_gt_mask = target[1][i][
+                        da_gt_mask = target[0][i][
                             :, pad_h : height - pad_h, pad_w : width - pad_w
                         ].unsqueeze(0)
                         da_gt_mask = torch.nn.functional.interpolate(
