@@ -372,6 +372,16 @@ class KITTIDaHeadLoss(nn.Module):
 
         """
         cfg = self.cfg
+
+        # TODO: This is debug code
+        new_targets = []
+        for i in [ 0,  1]:
+            # Create binary mask for each class where 1 is the class and 0 is not
+            mask = (targets == i).float()
+            new_targets.append(mask)
+            
+        targets = torch.stack(new_targets, axis=1)
+
         device = targets[0].device
         
         # Class label smoothing https://arxiv.org/pdf/1902.04103.pdf eqn 3
@@ -384,18 +394,12 @@ class KITTIDaHeadLoss(nn.Module):
         no = len(predictions[0])  # number of outputs
 
         drive_area_seg_predicts = predictions[1].view(-1)
-        drive_area_seg_targets = targets[0].view(-1)
+        drive_area_seg_targets = targets.view(-1)
         lseg_da = BCEseg(drive_area_seg_predicts, drive_area_seg_targets)
 
 
         metric = SegmentationMetric(2)
-        pad_w, pad_h = shapes[0][1][1]
-        pad_w = int(pad_w)
-        pad_h = int(pad_h)
         metric.reset()
-        IoU = metric.IntersectionOverUnion()
-
-        s = 3 / no  # output count scaling
 
         lseg_da *= cfg.LOSS.DA_SEG_GAIN * self.lambdas[3]
 
