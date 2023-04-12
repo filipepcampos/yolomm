@@ -899,6 +899,8 @@ def validate_road_kitti(
             if config.TEST.PLOTS:
                 if batch_i == 0:
                     for i in range(test_batch_size):
+                        print("output shape:", da_seg_out[i].shape)
+                        print("target shape:", target[0][i].shape)
                         img_test = cv2.imread(paths[i])
                         da_seg_mask = da_seg_out[i][
                             :, pad_h : height - pad_h, pad_w : width - pad_w
