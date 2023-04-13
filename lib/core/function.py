@@ -267,6 +267,10 @@ def validate(
     for batch_i, (img, target, paths, shapes) in tqdm(
         enumerate(val_loader), total=len(val_loader)
     ):
+        print("DEBUG STUFF")
+        print(len(target))
+        print(target[0].shape)
+        print(target[1].shape)
         if not config.DEBUG:
             img = img.to(device, non_blocking=True)
             assign_target = []
@@ -372,6 +376,7 @@ def validate(
                         da_gt_mask = da_gt_mask.int().squeeze().cpu().numpy()
                         # seg_mask = seg_mask > 0.5
                         # plot_img_and_mask(img_test, seg_mask, i,epoch,save_dir)
+                        print("debug, img_shape:", img_test.shape)
                         img_test1 = img_test.copy()
                         _ = show_seg_result(img_test, da_seg_mask, i, epoch, save_dir)
                         _ = show_seg_result(
@@ -832,7 +837,7 @@ def validate_road_kitti(
     for batch_i, (img, target, paths, shapes) in tqdm(
         enumerate(val_loader), total=len(val_loader)
     ):
-        if not config.DEBUG:
+        if not config.DEBUG:    
             img = img.to(device, non_blocking=True)
             assign_target = []
             for tgt in target:
@@ -866,6 +871,12 @@ def validate_road_kitti(
             da_IoU = da_metric.IntersectionOverUnion()
             da_mIoU = da_metric.meanIntersectionOverUnion()
 
+            print("Debug")
+            print(img)
+            print("=======\n\n\n")
+            print(target[0])
+            print("\n\n\n")
+
             da_acc_seg.update(da_acc, img.size(0))
             da_IoU_seg.update(da_IoU, img.size(0))
             da_mIoU_seg.update(da_mIoU, img.size(0))
@@ -875,32 +886,13 @@ def validate_road_kitti(
             )  # Compute loss
             losses.update(total_loss.item(), img.size(0))
 
-            # NMS
             t = time_synchronized()
-            #target[0][:, 2:] *= torch.Tensor([width, height, width, height]).to(
-            #    device
-            #)  # to pixels
-            #lb = (
-            #    [target[0][target[0][:, 0] == i, 1:] for i in range(nb)]
-            #    if save_hybrid
-            #    else []
-            #)  # for autolabelling
-            #output = non_max_suppression(
-            #    inf_out,
-            #    conf_thres=config.TEST.NMS_CONF_THRESHOLD,
-            #    iou_thres=config.TEST.NMS_IOU_THRESHOLD,
-            #    labels=lb,
-            #)
-            # output = non_max_suppression(inf_out, conf_thres=0.001, iou_thres=0.6)
-            # output = non_max_suppression(inf_out, conf_thres=config.TEST.NMS_CONF_THRES, iou_thres=config.TEST.NMS_IOU_THRES)
             t_nms = time_synchronized() - t
             if batch_i > 0:
                 T_nms.update(t_nms / img.size(0), img.size(0))
             if config.TEST.PLOTS:
                 if batch_i == 0:
                     for i in range(test_batch_size):
-                        print("output shape:", da_seg_out[i].shape)
-                        print("target shape:", target[0][i].shape)
                         img_test = cv2.imread(paths[i])
                         da_seg_mask = da_seg_out[i][
                             :, pad_h : height - pad_h, pad_w : width - pad_w
@@ -922,11 +914,12 @@ def validate_road_kitti(
                         da_gt_mask = da_gt_mask.int().squeeze().cpu().numpy()
                         # seg_mask = seg_mask > 0.5
                         # plot_img_and_mask(img_test, seg_mask, i,epoch,save_dir)
+
                         img_test1 = img_test.copy()
-                        _ = show_seg_result(img_test, da_seg_mask, i, epoch, save_dir)
-                        _ = show_seg_result(
-                            img_test1, da_gt_mask, i, epoch, save_dir, is_gt=True
-                        )
+                        # _ = show_seg_result(img_test, da_seg_mask, i, epoch, save_dir)
+                        # _ = show_seg_result(
+                        #     img_test1, da_gt_mask, i, epoch, save_dir, is_gt=True
+                        # )
 
     # Compute statistics
     # stats : [[all_img_correct]...[all_img_tcls]]
@@ -968,32 +961,6 @@ def validate_road_kitti(
     if (verbose or (nc <= 20 and not training)) and nc > 1 and len(stats):
         for i, c in enumerate(ap_class):
             print(pf % (names[c], seen, nt[c], p[i], r[i], ap50[i], ap[i]))
-
-    # Print speeds
-    t = tuple(x / seen * 1e3 for x in (t_inf, t_nms, t_inf + t_nms)) + (
-        imgsz,
-        imgsz,
-        batch_size,
-    )  # tuple
-    if not training:
-        print(
-            "Speed: %.1f/%.1f/%.1f ms inference/NMS/total per %gx%g image at batch-size %g"
-            % t
-        )
-
-    # Plots
-    if config.TEST.PLOTS:
-        confusion_matrix.plot(save_dir=save_dir, names=list(names.values()))
-        if wandb and wandb.run:
-            wandb.log({"Images": wandb_images})
-            wandb.log(
-                {
-                    "Validation": [
-                        wandb.Image(str(f), caption=f.name)
-                        for f in sorted(save_dir.glob("test*.jpg"))
-                    ]
-                }
-            )
 
     # Save JSON
     if config.TEST.SAVE_JSON and len(jdict):

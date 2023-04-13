@@ -305,7 +305,7 @@ def main():
             ]
         ),
     )
-    train_dataset = torch.utils.data.Subset(train_dataset, range(10000))
+    train_dataset = torch.utils.data.Subset(train_dataset, range(50))
     train_sampler = (
         torch.utils.data.distributed.DistributedSampler(train_dataset)
         if rank != -1
@@ -336,7 +336,7 @@ def main():
             ),
         )
 
-        valid_dataset = torch.utils.data.Subset(valid_dataset, range(500))
+        valid_dataset = torch.utils.data.Subset(valid_dataset, range(10))
 
         valid_loader = DataLoaderX(
             valid_dataset,
