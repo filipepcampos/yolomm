@@ -78,11 +78,7 @@ class MultimodalKITTIDataset(Dataset):
 
         self.db = self._get_db()
 
-        ###
-        ##########################################
-        ##########################################
-        ##########################################
-        ##########################################
+        # RangeNet parameters
         # save deats
         self.cfg = cfg
         self.root = self.img_root / "velodyne"
@@ -225,14 +221,13 @@ class MultimodalKITTIDataset(Dataset):
 
         labels_out = self.get_bounding_boxes(data["label"], img, ratio, pad, h, w)
         lidar_data = self.get_lidar_data(idx)
-        print(lidar_data)
 
         img = np.ascontiguousarray(img)
 
         target = labels_out
         img = self.transform(img)
 
-        return img, target, data["image"], shapes
+        return img, target, data["image"], shapes, lidar_data[0]
 
     def get_bounding_boxes(self, det_label, img, ratio, pad, h, w):
         labels = []
@@ -379,7 +374,7 @@ class MultimodalKITTIDataset(Dataset):
 
     @staticmethod
     def collate_fn(batch):
-        img, label, paths, shapes = zip(*batch)
+        img, label, paths, shapes, proj = zip(*batch)
         label_det = []
         for i, l_det in enumerate(label):
             l_det[:, 0] = i  # add target image index for build_targets()
@@ -391,6 +386,7 @@ class MultimodalKITTIDataset(Dataset):
             ],
             paths,
             shapes,
+            torch.stack(proj, 0),
         )
 
 

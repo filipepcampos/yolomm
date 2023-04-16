@@ -25,7 +25,7 @@ import lib.dataset as dataset
 from lib.config import cfg
 from lib.config import update_config
 from lib.core.loss import get_kitti_loss
-from lib.core.function import train
+from lib.core.function import train_mm
 from lib.core.function import validate_kitti
 from lib.core.general import fitness
 from lib.models import get_net
@@ -380,7 +380,7 @@ def main():
         if rank != -1:
             train_loader.sampler.set_epoch(epoch)
         # train for one epoch
-        train(
+        train_mm(
             cfg,
             train_loader,
             model,
