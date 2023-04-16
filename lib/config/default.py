@@ -28,7 +28,7 @@ _C.MODEL.STRU_WITHSHARE = False  # add share_block to segbranch
 _C.MODEL.HEADS_NAME = [""]
 _C.MODEL.PRETRAINED = ""
 _C.MODEL.PRETRAINED_DET = ""
-_C.MODEL.IMAGE_SIZE = [640, 640]  # width * height, ex: 192 * 256
+_C.MODEL.IMAGE_SIZE = [640, 224]  # width * height, ex: 192 * 256
 _C.MODEL.EXTRA = CN(new_allowed=True)
 
 
@@ -60,13 +60,12 @@ _C.DATASET = CN(new_allowed=True)
 # _C.DATASET.DATA_FORMAT = "jpg"
 # _C.DATASET.SELECT_DATA = False
 # _C.DATASET.ORG_IMG_SIZE = [720, 1280]
-_C.DATASET.DATAROOT = '/data/auto/kitti/object'       # the path of images folder
-_C.DATASET.LABELROOT = '/data/auto/kitti/object'     # the path of det_annotations folder
-_C.DATASET.MASKROOT = '/data/auto/kitti/semantics'                # the path of da_seg_annotations folder
-_C.DATASET.LANEROOT = '/data/auto/kitti/object/training/semantic'               # the path of ll_seg_annotations folder
-_C.DATASET.DATASET = "BddDataset"
-_C.DATASET.TRAIN_SET = "train"
-_C.DATASET.TEST_SET = "val"
+_C.DATASET.DATAROOT = "/data/auto/kitti/object"  # the path of images folder
+_C.DATASET.LABELROOT = "/data/auto/kitti/object"  # the path of det_annotations folder
+_C.DATASET.ROAD_ROOT = "/data/auto/kitti/road/data_road"
+_C.DATASET.DATASET = "KITTIRoadDataset"
+_C.DATASET.TRAIN_SET = "training"
+_C.DATASET.TEST_SET = "testing"
 _C.DATASET.DATA_FORMAT = "png"
 _C.DATASET.SELECT_DATA = False
 _C.DATASET.ORG_IMG_SIZE = [512, 1382]
