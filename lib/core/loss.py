@@ -377,7 +377,7 @@ class KITTIDaHeadLoss(nn.Module):
 
         # Calculate Losses
         drive_area_seg_predicts = predictions[1].view(-1)
-        drive_area_seg_targets = targets[0].view(-1)
+        drive_area_seg_targets = targets.view(-1)
         lseg_da = BCEseg(drive_area_seg_predicts, drive_area_seg_targets)
 
         metric = SegmentationMetric(2)

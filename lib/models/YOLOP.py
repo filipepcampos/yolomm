@@ -461,6 +461,7 @@ MCnet_share1 = [
 
 
 # The lane line and the driving area segment branches without share information with each other and without link
+
 YOLOP = [
     [24, 33, 42],  # Det_out_idx, Da_Segout_idx, LL_Segout_idx
     [-1, Focus, [3, 32, 3]],  # 0
