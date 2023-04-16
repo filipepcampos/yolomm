@@ -155,7 +155,7 @@ class KITTIRoadDataset(Dataset):
         h, w = img.shape[:2]
 
         (img, seg_label, _), ratio, pad = letterbox(
-            (img, seg_label, seg_label),  # TODO: This is stupid
+            (img, seg_label, img),  # TODO: This is stupid
             resized_shape,
             auto=True,
             scaleup=self.is_train,

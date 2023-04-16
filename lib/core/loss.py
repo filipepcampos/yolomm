@@ -372,30 +372,16 @@ class KITTIDaHeadLoss(nn.Module):
 
         """
         cfg = self.cfg
-        device = targets[0].device
         
-        # Class label smoothing https://arxiv.org/pdf/1902.04103.pdf eqn 3
-        cp, cn = smooth_BCE(eps=0.0)
-
         BCEseg = self.losses[0]
 
         # Calculate Losses
-        nt = 0  # number of targets
-        no = len(predictions[0])  # number of outputs
-
         drive_area_seg_predicts = predictions[1].view(-1)
         drive_area_seg_targets = targets[0].view(-1)
         lseg_da = BCEseg(drive_area_seg_predicts, drive_area_seg_targets)
 
-
         metric = SegmentationMetric(2)
-        pad_w, pad_h = shapes[0][1][1]
-        pad_w = int(pad_w)
-        pad_h = int(pad_h)
         metric.reset()
-        IoU = metric.IntersectionOverUnion()
-
-        s = 3 / no  # output count scaling
 
         lseg_da *= cfg.LOSS.DA_SEG_GAIN * self.lambdas[3]
 

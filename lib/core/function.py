@@ -267,10 +267,10 @@ def validate(
     for batch_i, (img, target, paths, shapes) in tqdm(
         enumerate(val_loader), total=len(val_loader)
     ):
-        print("DEBUG STUFF")
-        print(len(target))
-        print(target[0].shape)
-        print(target[1].shape)
+        # print("DEBUG STUFF")
+        # print(len(target))
+        # print(target[0].shape)
+        # print(target[1].shape)
         if not config.DEBUG:
             img = img.to(device, non_blocking=True)
             assign_target = []
@@ -376,7 +376,6 @@ def validate(
                         da_gt_mask = da_gt_mask.int().squeeze().cpu().numpy()
                         # seg_mask = seg_mask > 0.5
                         # plot_img_and_mask(img_test, seg_mask, i,epoch,save_dir)
-                        print("debug, img_shape:", img_test.shape)
                         img_test1 = img_test.copy()
                         _ = show_seg_result(img_test, da_seg_mask, i, epoch, save_dir)
                         _ = show_seg_result(
@@ -871,12 +870,6 @@ def validate_road_kitti(
             da_IoU = da_metric.IntersectionOverUnion()
             da_mIoU = da_metric.meanIntersectionOverUnion()
 
-            print("Debug")
-            print(img)
-            print("=======\n\n\n")
-            print(target[0])
-            print("\n\n\n")
-
             da_acc_seg.update(da_acc, img.size(0))
             da_IoU_seg.update(da_IoU, img.size(0))
             da_mIoU_seg.update(da_mIoU, img.size(0))
@@ -912,10 +905,8 @@ def validate_road_kitti(
 
                         da_seg_mask = da_seg_mask.int().squeeze().cpu().numpy()
                         da_gt_mask = da_gt_mask.int().squeeze().cpu().numpy()
-                        # seg_mask = seg_mask > 0.5
-                        # plot_img_and_mask(img_test, seg_mask, i,epoch,save_dir)
+                        plot_img_and_mask(img_test, da_seg_mask > 0.5, i,epoch,save_dir)
 
-                        img_test1 = img_test.copy()
                         # _ = show_seg_result(img_test, da_seg_mask, i, epoch, save_dir)
                         # _ = show_seg_result(
                         #     img_test1, da_gt_mask, i, epoch, save_dir, is_gt=True
