@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 import json
+import os
 
 # np.set_printoptions(threshold=np.inf)
 import random
@@ -13,13 +14,26 @@ from pathlib import Path
 from PIL import Image
 from torch.utils.data import Dataset
 from ..utils import letterbox, augment_hsv, random_perspective, xyxy2xywh, cutout
+from ..dataset.laserscan import LaserScan, SemLaserScan
 from lib.config import cfg
 
 single_cls = True  # just detect vehicle
 
 
 class MultimodalKITTIDataset(Dataset):
-    def __init__(self, cfg, is_train, inputsize=640, transform=None):
+    def __init__(self, cfg, is_train, labels, color_map, learning_map, learning_map_inv, sensor, max_points, inputsize=640, transform=None):
+        self.labels = labels
+        self.color_map = color_map
+        self.learning_map = learning_map
+        self.learning_map_inv = learning_map_inv
+        self.sensor = sensor
+        self.sensor_img_H = sensor["img_prop"]["height"]
+        self.sensor_img_W = sensor["img_prop"]["width"]
+        self.sensor_img_means = torch.tensor(sensor["img_means"], dtype=torch.float)
+        self.sensor_img_stds = torch.tensor(sensor["img_stds"], dtype=torch.float)
+        self.sensor_fov_up = sensor["fov_up"]
+        self.sensor_fov_down = sensor["fov_down"]
+        self.max_points = max_points
         """
         initial all the characteristic
 
@@ -69,8 +83,10 @@ class MultimodalKITTIDataset(Dataset):
         ##########################################
         ##########################################
         ##########################################
-        self.root = os.path.join(root, "sequences")
-        self.sequences = sequences
+        # save deats
+        self.cfg = cfg
+        self.root = self.img_root / "velodyne"
+
         self.labels = labels
         self.color_map = color_map
         self.learning_map = learning_map
@@ -83,7 +99,6 @@ class MultimodalKITTIDataset(Dataset):
         self.sensor_fov_up = sensor["fov_up"]
         self.sensor_fov_down = sensor["fov_down"]
         self.max_points = max_points
-        self.gt = gt
 
         # get number of classes (can't be len(self.learning_map) because there
         # are multiple repeated entries, so the number that matters is how many
@@ -91,13 +106,6 @@ class MultimodalKITTIDataset(Dataset):
         self.nclasses = len(self.learning_map_inv)
 
         # sanity checks
-
-        # make sure directory exists
-        if os.path.isdir(self.root):
-            print("Sequences folder exists! Using sequences from %s" % self.root)
-        else:
-            raise ValueError("Sequences folder doesn't exist! Exiting...")
-
         # make sure labels is a dict
         assert isinstance(self.labels, dict)
 
@@ -106,56 +114,6 @@ class MultimodalKITTIDataset(Dataset):
 
         # make sure learning_map is a dict
         assert isinstance(self.learning_map, dict)
-
-        # make sure sequences is a list
-        assert isinstance(self.sequences, list)
-
-        # placeholder for filenames
-        self.scan_files = []
-        self.label_files = []
-
-        # fill in with names, checking that all sequences are complete
-        for seq in self.sequences:
-            # to string
-            seq = "{0:02d}".format(int(seq))
-
-            print("parsing seq {}".format(seq))
-
-            # get paths for each
-            scan_path = os.path.join(self.root, seq, "velodyne")
-            label_path = os.path.join(self.root, seq, "labels")
-
-            # get files
-            scan_files = [
-                os.path.join(dp, f)
-                for dp, dn, fn in os.walk(os.path.expanduser(scan_path))
-                for f in fn
-                if is_scan(f)
-            ]
-            label_files = [
-                os.path.join(dp, f)
-                for dp, dn, fn in os.walk(os.path.expanduser(label_path))
-                for f in fn
-                if is_label(f)
-            ]
-
-            # check all scans have labels
-            if self.gt:
-                assert len(scan_files) == len(label_files)
-
-            # extend list
-            self.scan_files.extend(scan_files)
-            self.label_files.extend(label_files)
-
-        # sort for correspondance
-        self.scan_files.sort()
-        self.label_files.sort()
-
-        print(
-            "Using {} scans from sequences {}".format(
-                len(self.scan_files), self.sequences
-            )
-        )
 
     def _get_db(self):
         """
@@ -181,6 +139,12 @@ class MultimodalKITTIDataset(Dataset):
                 .replace(f".{self.data_format}", ".txt")
             )
 
+            scan_path = (
+                str(image_path)
+                .replace("image_2", "velodyne")
+                .replace(f".{self.data_format}", ".bin")
+            )
+
             lines = [line.split() for line in open(label_path).readlines()]
 
             gt = np.zeros((len(lines), 5))
@@ -202,18 +166,12 @@ class MultimodalKITTIDataset(Dataset):
                 gt[idx][0] = cls_id
                 gt[idx][1:] = bbox
 
-            rec = [{"image": str(image_path), "label": gt}]
+            rec = [{"image": str(image_path), "label": gt, "scan_path": scan_path}]
 
             gt_db += rec
 
         print("database build finish")
         return gt_db
-
-    def evaluate(self, cfg, preds, output_dir):
-        """
-        finished on children dataset
-        """
-        raise NotImplementedError
 
     def __len__(
         self,
@@ -265,10 +223,9 @@ class MultimodalKITTIDataset(Dataset):
         )
         shapes = (h0, w0), ((h / h0, w / w0), pad)  # for COCO mAP rescaling
 
-        det_label = data["label"]
-        labels = []
-
         labels_out = self.get_bounding_boxes(data["label"], img, ratio, pad, h, w)
+        lidar_data = self.get_lidar_data(idx)
+        print(lidar_data)
 
         img = np.ascontiguousarray(img)
 
@@ -307,7 +264,79 @@ class MultimodalKITTIDataset(Dataset):
         if len(labels):
             labels_out[:, 1:] = torch.from_numpy(labels)
         return labels_out
+    
+    def get_lidar_data(self, idx):
+        # get item in tensor shape
+        scan_file = self.db[idx]["scan_path"]
 
+        # open a semantic laserscan
+        scan = LaserScan(
+            project=True,
+            H=self.sensor_img_H,
+            W=self.sensor_img_W,
+            fov_up=self.sensor_fov_up,
+            fov_down=self.sensor_fov_down,
+        )
+
+        # open and obtain scan
+        scan.open_scan(scan_file)
+
+        # make a tensor of the uncompressed data (with the max num points)
+        unproj_n_points = scan.points.shape[0]
+        unproj_xyz = torch.full((self.max_points, 3), -1.0, dtype=torch.float)
+        unproj_xyz[:unproj_n_points] = torch.from_numpy(scan.points)
+        unproj_range = torch.full([self.max_points], -1.0, dtype=torch.float)
+        unproj_range[:unproj_n_points] = torch.from_numpy(scan.unproj_range)
+        unproj_remissions = torch.full([self.max_points], -1.0, dtype=torch.float)
+        unproj_remissions[:unproj_n_points] = torch.from_numpy(scan.remissions)
+        unproj_labels = []
+
+        # get points and labels
+        proj_range = torch.from_numpy(scan.proj_range).clone()
+        proj_xyz = torch.from_numpy(scan.proj_xyz).clone()
+        proj_remission = torch.from_numpy(scan.proj_remission).clone()
+        proj_mask = torch.from_numpy(scan.proj_mask)
+        proj_labels = []
+        proj_x = torch.full([self.max_points], -1, dtype=torch.long)
+        proj_x[:unproj_n_points] = torch.from_numpy(scan.proj_x)
+        proj_y = torch.full([self.max_points], -1, dtype=torch.long)
+        proj_y[:unproj_n_points] = torch.from_numpy(scan.proj_y)
+        proj = torch.cat(
+            [
+                proj_range.unsqueeze(0).clone(),
+                proj_xyz.clone().permute(2, 0, 1),
+                proj_remission.unsqueeze(0).clone(),
+            ]
+        )
+        proj = (proj - self.sensor_img_means[:, None, None]) / self.sensor_img_stds[
+            :, None, None
+        ]
+        proj = proj * proj_mask.float()
+
+        # get name and sequence
+        path_norm = os.path.normpath(scan_file)
+        path_split = path_norm.split(os.sep)
+        path_seq = path_split[-3]
+        path_name = path_split[-1].replace(".bin", ".label")
+
+        # return
+        return (
+            proj,
+            proj_mask,
+            proj_labels,
+            unproj_labels,
+            path_seq,
+            path_name,
+            proj_x,
+            proj_y,
+            proj_range,
+            unproj_range,
+            proj_xyz,
+            unproj_xyz,
+            proj_remission,
+            unproj_remissions,
+            unproj_n_points
+        )
 
     def select_data(self, db):
         """
@@ -321,6 +350,32 @@ class MultimodalKITTIDataset(Dataset):
         """
         db_selected = ...
         return db_selected
+    
+    @staticmethod
+    def map(label, mapdict):
+        # put label from original values to xentropy
+        # or vice-versa, depending on dictionary values
+        # make learning map a lookup table
+        maxkey = 0
+        for key, data in mapdict.items():
+            if isinstance(data, list):
+                nel = len(data)
+            else:
+                nel = 1
+            if key > maxkey:
+                maxkey = key
+        # +100 hack making lut bigger just in case there are unknown labels
+        if nel > 1:
+            lut = np.zeros((maxkey + 100, nel), dtype=np.int32)
+        else:
+            lut = np.zeros((maxkey + 100), dtype=np.int32)
+        for key, data in mapdict.items():
+            try:
+                lut[key] = data
+            except IndexError:
+                print("Wrong key ", key)
+        # do the mapping
+        return lut[label]
 
     @staticmethod
     def collate_fn(batch):

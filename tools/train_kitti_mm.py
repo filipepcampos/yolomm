@@ -6,7 +6,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(BASE_DIR)
 
 import pprint
-import time
+import yaml
 import torch
 import torch.nn.parallel
 from torch.nn.parallel import DistributedDataParallel as DDP
@@ -18,17 +18,15 @@ import torch.utils.data
 import torch.utils.data.distributed
 import torchvision.transforms as transforms
 import numpy as np
-import yaml
 from lib.utils import DataLoaderX, torch_distributed_zero_first
 from tensorboardX import SummaryWriter
 
 import lib.dataset as dataset
-from lib.dataset.semantic_kitti import Parser
 from lib.config import cfg
 from lib.config import update_config
-from lib.core.loss import get_kitti_da_loss
-from lib.core.function import train_semantic_kitti
-from lib.core.function import validate_semantic_kitti
+from lib.core.loss import get_kitti_loss
+from lib.core.function import train
+from lib.core.function import validate_kitti
 from lib.core.general import fitness
 from lib.models import get_net
 from lib.utils import is_parallel
@@ -73,27 +71,10 @@ def parse_args():
     return args
 
 
-def override_config(cfg):
-    """
-    A quick trick to ensure the correct config is always applied
-    """
-    cfg.defrost()
-    cfg.DATASET.DATAROOT = "/data/auto/semantic-kitti"  # the path of images folder
-    cfg.DATASET.DATACFG = "/home/up201905609/yolomm/lib/config/semantic_kitti_v2.yaml"
-    cfg.DATASET.DATASET = "SemanticKITTI"
-    cfg.DATASET.DATA_FORMAT = "png"
-    cfg.DATASET.SELECT_DATA = False
-    cfg.DATASET.ORG_IMG_SIZE = [512, 1382]
-    cfg.MODEL.IMAGE_SIZE = [2048, 64]  # width * height, ex: 192 * 256
-    cfg.num_seg_class = 13
-    cfg.freeze()
-
-
 def main():
     # set all the configurations
     args = parse_args()
     update_config(cfg, args)
-    override_config(cfg)
 
     # Set DDP variables
     world_size = int(os.environ["WORLD_SIZE"]) if "WORLD_SIZE" in os.environ else 1
@@ -150,7 +131,7 @@ def main():
     # print("finish build model")
 
     # define loss function (criterion) and optimizer
-    criterion = get_kitti_da_loss(cfg, device=device)
+    criterion = get_kitti_loss(cfg, device=device)
     optimizer = get_optimizer(cfg, model)
 
     # load checkpoint model
@@ -313,15 +294,12 @@ def main():
         mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
     )
 
-    print("dataset")
-    data = yaml.safe_load(open(cfg.DATASET.DATACFG, 'r'))
+    data = yaml.safe_load(open(cfg.DATASET.DATACFG, "r"))
 
-    parser = Parser(
+    dataset = eval("dataset." + cfg.DATASET.DATASET)(
         cfg=cfg,
-        root=cfg.DATASET.DATAROOT,
-        train_sequences=data["split"]["train"],
-        valid_sequences=data["split"]["valid"],
-        test_sequences=None,
+        is_train=True,
+        inputsize=cfg.MODEL.IMAGE_SIZE,
         labels=data["labels"],
         color_map=data["color_map"],
         learning_map=data["learning_map"],
@@ -330,28 +308,17 @@ def main():
         # max_points=self.ARCH["dataset"]["max_points"],
         sensor=data["sensor"],
         max_points=150000,
-        batch_size=cfg.TRAIN.BATCH_SIZE_PER_GPU * len(cfg.GPUS),
-        workers=cfg.WORKERS,
-        gt=True,
-        shuffle_train=True,
+        transform=transforms.Compose(
+            [
+                transforms.ToTensor(),
+                normalize,
+            ]
+        ),
     )
 
-    train_dataset = parser.get_train_set()
-
-    # DEBUG TODO
-    # datum = train_dataset[0]
-    # proj, proj_mask, proj_labels, unproj_labels, path_seq, path_name, proj_x, proj_y, proj_range, unproj_range, proj_xyz, unproj_xyz, proj_remission, unproj_remissions, unproj_n_points, shapes = datum
-    # import matplotlib.pyplot as plt
-    # print(proj.shape)
-    # print(proj_labels.shape)
-    # print(proj_range)
-
-    # plt.imshow(proj_labels)
-    # plt.savefig('proj_labels.png')
-    # kk
-
+    TRAIN_SIZE = 0.8
     train_dataset = torch.utils.data.Subset(
-        train_dataset, range(0, 5, 1)
+        dataset, range(0, int(TRAIN_SIZE * len(dataset)))
     )
 
     train_sampler = (
@@ -367,15 +334,13 @@ def main():
         num_workers=cfg.WORKERS,
         sampler=train_sampler,
         pin_memory=cfg.PIN_MEMORY,
-        #collate_fn=dataset.collate_fn,
+        collate_fn=dataset.collate_fn,
     )
     num_batch = len(train_loader)
 
     if rank in [-1, 0]:
-        valid_dataset = parser.get_valid_set()
-
         valid_dataset = torch.utils.data.Subset(
-            valid_dataset, range(0, 2, 1)
+            dataset, range(int(TRAIN_SIZE * len(dataset)), len(dataset))
         )
 
         valid_loader = DataLoaderX(
@@ -384,14 +349,14 @@ def main():
             shuffle=False,
             num_workers=cfg.WORKERS,
             pin_memory=cfg.PIN_MEMORY,
-            # collate_fn=dataset.collate_fn,
+            collate_fn=dataset.collate_fn,
         )
         print("load data finished")
 
     if rank in [-1, 0]:
         if cfg.NEED_AUTOANCHOR:
             logger.info("begin check anchors")
-            run_anchor(model,
+            run_anchor(
                 logger,
                 train_dataset,
                 model=model,
@@ -415,7 +380,7 @@ def main():
         if rank != -1:
             train_loader.sampler.set_epoch(epoch)
         # train for one epoch
-        train_semantic_kitti(
+        train(
             cfg,
             train_loader,
             model,
@@ -433,6 +398,7 @@ def main():
 
         lr_scheduler.step()
 
+        # TODO: Adapt validation for kitti
         # evaluate on validation set
         if (
             epoch % cfg.TRAIN.VAL_FREQ == 0 or epoch == cfg.TRAIN.END_EPOCH
@@ -445,7 +411,7 @@ def main():
                 total_loss,
                 maps,
                 times,
-            ) = validate_semantic_kitti(
+            ) = validate_kitti(
                 epoch,
                 cfg,
                 valid_loader,
@@ -485,11 +451,11 @@ def main():
             )
             logger.info(msg)
 
-            # if perf_indicator >= best_perf:
-            #     best_perf = perf_indicator
-            #     best_model = True
-            # else:
-            #     best_model = False
+        # if perf_indicator >= best_perf:
+        #     best_perf = perf_indicator
+        #     best_model = True
+        # else:
+        #     best_model = False
 
         # save checkpoint model and best model
         if rank in [-1, 0]:

@@ -372,7 +372,7 @@ class KITTIDaHeadLoss(nn.Module):
 
         """
         cfg = self.cfg
-        
+
         BCEseg = self.losses[0]
 
         # Calculate Losses
@@ -393,9 +393,8 @@ class KITTIDaHeadLoss(nn.Module):
 
         loss = lseg_da
 
-        return loss, (
-            lseg_da.item()
-        )
+        return loss, (lseg_da.item())
+
 
 def get_kitti_loss(cfg, device):
     BCEcls = nn.BCEWithLogitsLoss(
@@ -413,6 +412,7 @@ def get_kitti_loss(cfg, device):
     loss_list = [BCEcls, BCEobj]
     loss = KITTIMultiHeadLoss(loss_list, cfg=cfg, lambdas=cfg.LOSS.MULTI_HEAD_LAMBDA)
     return loss
+
 
 def get_kitti_da_loss(cfg, device):
     # segmentation loss criteria

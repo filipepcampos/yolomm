@@ -63,12 +63,13 @@ _C.DATASET = CN(new_allowed=True)
 _C.DATASET.DATAROOT = "/data/auto/kitti/object"  # the path of images folder
 _C.DATASET.LABELROOT = "/data/auto/kitti/object"  # the path of det_annotations folder
 _C.DATASET.ROAD_ROOT = "/data/auto/kitti/road/data_road"
-_C.DATASET.DATASET = "KITTIDataset"
+_C.DATASET.DATASET = "MultimodalKITTIDataset"
 _C.DATASET.TRAIN_SET = "training"
 _C.DATASET.TEST_SET = "testing"
 _C.DATASET.DATA_FORMAT = "png"
 _C.DATASET.SELECT_DATA = False
 _C.DATASET.ORG_IMG_SIZE = [512, 1382]
+_C.DATASET.DATACFG = "/home/up201905609/yolomm/lib/config/semantic_kitti_v2.yaml"
 
 # training data augmentation
 _C.DATASET.FLIP = True

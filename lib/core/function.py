@@ -198,13 +198,30 @@ def train_semantic_kitti(
     model.train()
     start = time.time()
     for i, datum in enumerate(train_loader):
-        proj, proj_mask, proj_labels, unproj_labels, path_seq, path_name, proj_x, proj_y, proj_range, unproj_range, proj_xyz, unproj_xyz, proj_remission, unproj_remissions, unproj_n_points, shapes = datum
+        (
+            proj,
+            proj_mask,
+            proj_labels,
+            unproj_labels,
+            path_seq,
+            path_name,
+            proj_x,
+            proj_y,
+            proj_range,
+            unproj_range,
+            proj_xyz,
+            unproj_xyz,
+            proj_remission,
+            unproj_remissions,
+            unproj_n_points,
+            shapes,
+        ) = datum
         print("Proj shape: {}".format(proj.shape))
         print("Proj mask shape: {}".format(proj_mask.shape))
         print("Proj labels shape: {}".format(proj_labels.shape))
         input = proj_range
         target = proj_labels
-        
+
         intermediate = time.time()
         # print('tims:{}'.format(intermediate-start))
         num_iter = i + num_batch * (epoch - 1)
@@ -243,7 +260,7 @@ def train_semantic_kitti(
             print("Target_shape, debug", target.shape)
         with amp.autocast(enabled=device.type != "cpu"):
             outputs = model(input)
-            total_loss, head_losses = criterion(outputs, target, shapes, model) # TODO
+            total_loss, head_losses = criterion(outputs, target, shapes, model)  # TODO
 
         # compute gradient and do update step
         optimizer.zero_grad()
@@ -859,6 +876,7 @@ def validate(
     t = [T_inf.avg, T_nms.avg]
     return da_segment_result, ll_segment_result, detect_result, losses.avg, maps, t
 
+
 def validate_semantic_kitti(
     epoch,
     config,
@@ -964,20 +982,35 @@ def validate_semantic_kitti(
     model.eval()
     jdict, stats, ap, ap_class, wandb_images = [], [], [], [], []
 
-    for batch_i, datum in tqdm(
-        enumerate(val_loader), total=len(val_loader)
-    ):
-        proj, proj_mask, proj_labels, unproj_labels, path_seq, path_name, proj_x, proj_y, proj_range, unproj_range, proj_xyz, unproj_xyz, proj_remission, unproj_remissions, unproj_n_points, shapes = datum
+    for batch_i, datum in tqdm(enumerate(val_loader), total=len(val_loader)):
+        (
+            proj,
+            proj_mask,
+            proj_labels,
+            unproj_labels,
+            path_seq,
+            path_name,
+            proj_x,
+            proj_y,
+            proj_range,
+            unproj_range,
+            proj_xyz,
+            unproj_xyz,
+            proj_remission,
+            unproj_remissions,
+            unproj_n_points,
+            shapes,
+        ) = datum
         img = proj
         target = proj_labels
 
         # TODO: Temporary solution
         new_targets = []
-        for i in [ 0,  1]:
+        for i in [0, 1]:
             # Create binary mask for each class where 1 is the class and 0 is not
             mask = (target == i).float()
             new_targets.append(mask)
-            
+
         target = torch.stack(new_targets, axis=1)
 
         if not config.DEBUG:
@@ -1137,6 +1170,7 @@ def validate_semantic_kitti(
     t = [T_inf.avg, T_nms.avg]
     return da_segment_result, ll_segment_result, detect_result, losses.avg, maps, t
 
+
 def validate_road_kitti(
     epoch,
     config,
@@ -1245,7 +1279,7 @@ def validate_road_kitti(
     for batch_i, (img, target, paths, shapes) in tqdm(
         enumerate(val_loader), total=len(val_loader)
     ):
-        if not config.DEBUG:    
+        if not config.DEBUG:
             img = img.to(device, non_blocking=True)
             assign_target = []
             for tgt in target:
@@ -1314,7 +1348,9 @@ def validate_road_kitti(
 
                         da_seg_mask = da_seg_mask.int().squeeze().cpu().numpy()
                         da_gt_mask = da_gt_mask.int().squeeze().cpu().numpy()
-                        plot_img_and_mask(img_test, da_seg_mask > 0.5, i,epoch,save_dir)
+                        plot_img_and_mask(
+                            img_test, da_seg_mask > 0.5, i, epoch, save_dir
+                        )
 
                         # _ = show_seg_result(img_test, da_seg_mask, i, epoch, save_dir)
                         # _ = show_seg_result(
@@ -1412,6 +1448,7 @@ def validate_road_kitti(
     detect_result = np.asarray([mp, mr, map50, map])
     t = [T_inf.avg, T_nms.avg]
     return da_segment_result, ll_segment_result, detect_result, losses.avg, maps, t
+
 
 def validate_kitti(
     epoch,
@@ -1570,7 +1607,7 @@ def validate_kitti(
                     for i in range(test_batch_size):
                         img_det = cv2.imread(paths[i])
                         img_gt = img_det.copy()
-                        #det = output[i].clone()
+                        # det = output[i].clone()
                         # if len(det):
                         #     det[:, :4] = scale_coords(
                         #         img[i].shape[1:], det[:, :4], img_det.shape
