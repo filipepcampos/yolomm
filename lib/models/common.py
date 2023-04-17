@@ -114,6 +114,24 @@ class Conv(nn.Module):
     def fuseforward(self, x):
         return self.act(self.conv(x))
 
+class WidthConv(nn.Module):
+    # Width convolution (keeps the same height)
+    def __init__(
+        self, c1, c2, k=1, s=1, p=None, g=1, act=True
+    ):  # ch_in, ch_out, kernel, stride, padding, groups
+        super(WidthConv, self).__init__()
+        self.conv = nn.Conv2d(c1, c2, k, (1, s), autopad(k, p), groups=g, bias=False)
+        self.bn = nn.BatchNorm2d(c2)
+        try:
+            self.act = Hardswish() if act else nn.Identity()
+        except:
+            self.act = nn.Identity()
+
+    def forward(self, x):
+        return self.act(self.bn(self.conv(x)))
+
+    def fuseforward(self, x):
+        return self.act(self.conv(x))
 
 class Bottleneck(nn.Module):
     # Standard bottleneck
@@ -199,11 +217,12 @@ class Concat(nn.Module):
         self.d = dimension
 
     def forward(self, x):
-        """print("***********************")
-        for f in x:
-            print(f.shape)"""
         return torch.cat(x, self.d)
 
+class Add(nn.Module):
+    # Add two vectors together
+    def forward(self, x):
+        return torch.add(x[0], x[1])
 
 class Detect(nn.Module):
     stride = None  # strides computed during build

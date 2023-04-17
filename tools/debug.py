@@ -10,35 +10,15 @@ import time
 import torch
 import torch.nn.parallel
 from torch.nn.parallel import DistributedDataParallel as DDP
-from torch.cuda import amp
-import torch.distributed as dist
-import torch.backends.cudnn as cudnn
 import torch.optim
 import torch.utils.data
 import torch.utils.data.distributed
-import torchvision.transforms as transforms
-import numpy as np
-import yaml
-from lib.utils import DataLoaderX, torch_distributed_zero_first
-from tensorboardX import SummaryWriter
 
 from lib.models import get_net
-import lib.dataset as dataset
-from lib.dataset.semantic_kitti import Parser
 from lib.config import cfg
 from lib.config import update_config
-from lib.core.loss import get_kitti_da_loss
-from lib.core.function import train_semantic_kitti
-from lib.core.function import validate_semantic_kitti
-from lib.core.general import fitness
 from lib.models import get_net
-from lib.utils import is_parallel
-from lib.utils.utils import get_optimizer
-from lib.utils.utils import save_checkpoint
-from lib.utils.utils import create_logger, select_device
-from lib.utils import run_anchor
 
-import torchsummary
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Train Multitask network")
@@ -83,5 +63,9 @@ def get_cfg():
 
 cfg = get_cfg()
 model = get_net(cfg)
-torchsummary.summary(model, (3, 224, 640))
+input_img = torch.randn((1, 3, 256, 512))
+input_proj = torch.randn((1, 5, 64, 2048))
+print(input_img.shape)
+print("________________\n\n\n\n")
+output = model(input_img, input_proj)
 

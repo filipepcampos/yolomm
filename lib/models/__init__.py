@@ -1,1 +1,1 @@
-from .YOLOP import get_net
+from .YOLOMM import get_net
