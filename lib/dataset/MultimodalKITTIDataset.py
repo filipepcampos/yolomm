@@ -206,9 +206,11 @@ class MultimodalKITTIDataset(Dataset):
             resized_shape = max(resized_shape)
         h0, w0 = img.shape[:2]  # orig hw
         r = resized_shape / max(h0, w0)  # resize image to img_size
-        if r != 1:  # always resize down, only resize up if training with augmentation
-            interp = cv2.INTER_AREA if r < 1 else cv2.INTER_LINEAR
-            img = cv2.resize(img, (int(w0 * r), int(h0 * r)), interpolation=interp)
+
+        # if r != 1:  # always resize down, only resize up if training with augmentation
+        #     interp = cv2.INTER_AREA if r < 1 else cv2.INTER_LINEAR
+        #     img = cv2.resize(img, (int(w0 * r), int(h0 * r)), interpolation=interp)
+        img = cv2.resize(img, (512, 256), interpolation=cv2.INTER_LINEAR)
         h, w = img.shape[:2]
 
         (img, _, _), ratio, pad = letterbox(

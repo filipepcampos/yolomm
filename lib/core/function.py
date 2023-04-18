@@ -200,8 +200,6 @@ def train_mm(
         intermediate = time.time()
         # print('tims:{}'.format(intermediate-start))
         num_iter = i + num_batch * (epoch - 1)
-        print(input.shape)
-        print("proj shape:", proj.shape)
 
         if num_iter < num_warmup:
             # warm up
@@ -230,12 +228,13 @@ def train_mm(
         data_time.update(time.time() - start)
         if not cfg.DEBUG:
             input = input.to(device, non_blocking=True)
+            proj = proj.to(device, non_blocking=True)
             assign_target = []
             for tgt in target:
                 assign_target.append(tgt.to(device))
             target = assign_target
         with amp.autocast(enabled=device.type != "cpu"):
-            outputs = model(input)
+            outputs = model(input, proj)
             total_loss, head_losses = criterion(outputs, target, shapes, model)
 
         # compute gradient and do update step
@@ -1672,11 +1671,12 @@ def validate_kitti(
     model.eval()
     jdict, stats, ap, ap_class, wandb_images = [], [], [], [], []
 
-    for batch_i, (img, target, paths, shapes) in tqdm(
+    for batch_i, (img, target, paths, shapes, proj) in tqdm(
         enumerate(val_loader), total=len(val_loader)
     ):
         if not config.DEBUG:
             img = img.to(device, non_blocking=True)
+            proj = proj.to(device, non_blocking=True)
             assign_target = []
             for tgt in target:
                 assign_target.append(tgt.to(device))
@@ -1690,7 +1690,7 @@ def validate_kitti(
             ratio = shapes[0][1][0][0]
 
             t = time_synchronized()
-            det_out, da_seg_out, ll_seg_out = model(img)
+            det_out, da_seg_out, ll_seg_out = model(img, proj)
             t_inf = time_synchronized() - t
             if batch_i > 0:
                 T_inf.update(t_inf / img.size(0), img.size(0))
