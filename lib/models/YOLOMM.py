@@ -89,11 +89,15 @@ YOLOMM = [
     [-1, Upsample, [None, 2, "nearest"]],  # 44
     [-1, BottleneckCSP, [128, 64, 1, False]],  # 45
     [-1, Conv, [64, 32, 3, 1]],  # 46
-    [-1, Upsample, [None, 2, "nearest"]],  # 47
+    [-1, Upsample, [None, (1, 2), "nearest"]],  # 47
     [-1, Conv, [32, 16, 3, 1]],  # 48
     [-1, BottleneckCSP, [16, 8, 1, False]],  # 49
-    [-1, Upsample, [None, 2, "nearest"]],  # 50
-    [-1, Conv, [8, 2, 3, 1]],  # 51 Lane line segmentation head
+    [-1, Upsample, [None, (1, 2), "nearest"]],  # 50
+    [-1, Conv, [8, 8, 3, 1]],  # 51
+    [-1, Upsample, [None, (1, 2), "nearest"]],  # 52
+    [-1, Conv, [8, 8, 3, 1]],  # 53
+    [-1, Upsample, [None, (1, 2), "nearest"]],  # 54
+    [-1, Conv, [8, 2, 3, 1]],  # 55 Lidar segmentation head
 ]
 
 
@@ -154,6 +158,9 @@ class MCnet(nn.Module):
         LL_fmap = []
         for i, block in enumerate(self.model):
             if block.from_ != -1:
+                if block.from_ == 25:
+                    print("\n\ndebug TODO-1 ", len(cache[block.from_]))
+                    print("debug TODO-2 ", cache[block.from_][0].shape)
                 img = (
                     cache[block.from_]
                     if isinstance(block.from_, int)
@@ -164,7 +171,11 @@ class MCnet(nn.Module):
                 proj = block(proj)
                 cache.append(proj if block.index in self.save else None)
             else:
+                print("debug block type ", type(block))
+                print("debug block index ", i)
+                print("debug before block ", len(img), img[0].shape)
                 img = block(img)
+                print("debug after block ", len(img), img[0].shape)
                 cache.append(img if block.index in self.save else None)
             
                 if i in self.seg_out_idx:  # save driving area segment result
