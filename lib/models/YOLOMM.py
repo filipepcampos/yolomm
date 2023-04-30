@@ -158,9 +158,6 @@ class MCnet(nn.Module):
         LL_fmap = []
         for i, block in enumerate(self.model):
             if block.from_ != -1:
-                if block.from_ == 25:
-                    print("\n\ndebug TODO-1 ", len(cache[block.from_]))
-                    print("debug TODO-2 ", cache[block.from_][0].shape)
                 img = (
                     cache[block.from_]
                     if isinstance(block.from_, int)
@@ -171,11 +168,7 @@ class MCnet(nn.Module):
                 proj = block(proj)
                 cache.append(proj if block.index in self.save else None)
             else:
-                print("debug block type ", type(block))
-                print("debug block index ", i)
-                print("debug before block ", len(img), img[0].shape)
                 img = block(img)
-                print("debug after block ", len(img), img[0].shape)
                 cache.append(img if block.index in self.save else None)
             
                 if i in self.seg_out_idx:  # save driving area segment result
