@@ -38,14 +38,14 @@ YOLOMM = [
     [-1, BottleneckCSP, [16, 16, 1]],  # 1
     [-1, WidthConv, [16, 32, 3, 2]],  # 2
     [-1, BottleneckCSP, [32, 32, 1]],  # 3
-    [-1, WidthConv, [32, 64, 3, 2]],  # 4 
-    [-1, BottleneckCSP, [64, 64, 1]], # 5
-    [-1, WidthConv, [64, 64, 3, 2]],  # 6
-    [-1, BottleneckCSP, [64, 64, 1]],  # 7 end of proj branch
+    [-1, WidthConv, [32, 32, 3, 2]],  # 4 
+    [-1, BottleneckCSP, [32, 32, 1]], # 5
+    [-1, WidthConv, [32, 32, 3, 2]],  # 6
+    [-1, BottleneckCSP, [32, 32, 1]],  # 7 end of proj branch
     [-1, Focus, [3, 32, 3]],  # 8 start of img branch
-    [-1, Conv, [32, 64, 3, 2]],  # 9
-    [-1, BottleneckCSP, [64, 64, 1]],  # 10
-    [[-1, 7], Add, []], # 11 join both branches
+    [-1, Conv, [32, 32, 3, 2]],  # 9
+    [-1, BottleneckCSP, [32, 32, 1]],  # 10
+    [[-1, 7], Concat, [1]], # 11 join both branches
     [-1, Conv, [64, 128, 3, 2]],  # 12
     [-1, BottleneckCSP, [128, 128, 3]],  # 13
     [-1, Conv, [128, 256, 3, 2]],  # 14
