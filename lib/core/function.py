@@ -1054,7 +1054,7 @@ def validate_semantic_kitti(
 
     seen = 0
     confusion_matrix = ConfusionMatrix(nc=model.nc)  # detector confusion matrix
-    da_metric = SegmentationMetric(config.num_seg_class)  # segment confusion matrix
+    lidar_metric = SegmentationMetric(config.num_seg_class)  # segment confusion matrix
 
     names = {
         k: v
@@ -1088,9 +1088,9 @@ def validate_semantic_kitti(
 
     losses = AverageMeter()
 
-    da_acc_seg = AverageMeter()
-    da_IoU_seg = AverageMeter()
-    da_mIoU_seg = AverageMeter()
+    lidar_acc_seg = AverageMeter()
+    lidar_IoU_seg = AverageMeter()
+    lidar_mIoU_seg = AverageMeter()
 
     T_inf = AverageMeter()
     T_nms = AverageMeter()
@@ -1099,37 +1099,9 @@ def validate_semantic_kitti(
     model.eval()
     jdict, stats, ap, ap_class, wandb_images = [], [], [], [], []
 
-    for batch_i, datum in tqdm(enumerate(val_loader), total=len(val_loader)):
-        (
-            proj,
-            proj_mask,
-            proj_labels,
-            unproj_labels,
-            path_seq,
-            path_name,
-            proj_x,
-            proj_y,
-            proj_range,
-            unproj_range,
-            proj_xyz,
-            unproj_xyz,
-            proj_remission,
-            unproj_remissions,
-            unproj_n_points,
-            shapes,
-        ) = datum
-        img = proj
-        target = proj_labels
-
-        # TODO: Temporary solution
-        new_targets = []
-        for i in [0, 1]:
-            # Create binary mask for each class where 1 is the class and 0 is not
-            mask = (target == i).float()
-            new_targets.append(mask)
-
-        target = torch.stack(new_targets, axis=1)
-
+    for batch_i, (img, target, paths, shapes) in tqdm(
+        enumerate(val_loader), total=len(val_loader)
+    ):
         if not config.DEBUG:
             img = img.to(device, non_blocking=True)
             assign_target = []
@@ -1139,35 +1111,74 @@ def validate_semantic_kitti(
             nb, _, height, width = img.shape  # batch size, channel, height, width
 
         with torch.no_grad():
-            t = time_synchronized()
+            pad_w, pad_h = shapes[0][1][1]
+            pad_w = int(pad_w)
+            pad_h = int(pad_h)
+            ratio = shapes[0][1][0][0]
 
-            tmp = img.unsqueeze(1)
-            img = torch.cat((tmp, tmp, tmp), axis=1).to(device, non_blocking=True)
-            det_out, da_seg_out, ll_seg_out = model(img)
+            t = time_synchronized()
+            det_out, da_seg_out, lidar_seg_out = model(img)
             t_inf = time_synchronized() - t
             if batch_i > 0:
                 T_inf.update(t_inf / img.size(0), img.size(0))
 
+            inf_out, train_out = det_out
+
             # driving area segment evaluation
-            _, da_predict = torch.max(da_seg_out, 1)
-            _, da_gt = torch.max(target[0], 1)
-            da_predict = da_predict[:, pad_h : height - pad_h, pad_w : width - pad_w]
-            da_gt = da_gt[:, pad_h : height - pad_h, pad_w : width - pad_w]
+            _, lidar_predict = torch.max(lidar_seg_out, 1)
+            _, lidar_gt = torch.max(target[0], 1)
+            lidar_predict = lidar_predict[:, pad_h : height - pad_h, pad_w : width - pad_w]
+            lidar_gt = lidar_gt[:, pad_h : height - pad_h, pad_w : width - pad_w]
 
-            da_metric.reset()
-            da_metric.addBatch(da_predict.cpu(), da_gt.cpu())
-            da_acc = da_metric.pixelAccuracy()
-            da_IoU = da_metric.IntersectionOverUnion()
-            da_mIoU = da_metric.meanIntersectionOverUnion()
+            lidar_metric.reset()
+            lidar_metric.addBatch(lidar_predict.cpu(), lidar_gt.cpu())
+            lidar_acc = lidar_metric.pixelAccuracy()
+            lidar_IoU = lidar_metric.IntersectionOverUnion()
+            lidar_mIoU = lidar_metric.meanIntersectionOverUnion()
 
-            da_acc_seg.update(da_acc, img.size(0))
-            da_IoU_seg.update(da_IoU, img.size(0))
-            da_mIoU_seg.update(da_mIoU, img.size(0))
+            lidar_acc_seg.update(lidar_acc, img.size(0))
+            lidar_IoU_seg.update(lidar_IoU, img.size(0))
+            lidar_mIoU_seg.update(lidar_mIoU, img.size(0))
 
             total_loss, head_losses = criterion(
-                (train_out, da_seg_out, ll_seg_out), target, shapes, model
+                (train_out, da_seg_out, lidar_seg_out), target, shapes, model
             )  # Compute loss
             losses.update(total_loss.item(), img.size(0))
+
+            t = time_synchronized()
+            t_nms = time_synchronized() - t
+            if batch_i > 0:
+                T_nms.update(t_nms / img.size(0), img.size(0))
+            if config.TEST.PLOTS:
+                if batch_i == 0:
+                    for i in range(test_batch_size):
+                        img_test = cv2.imread(paths[i])
+                        lidar_seg_mask = lidar_seg_out[i][
+                            :, pad_h : height - pad_h, pad_w : width - pad_w
+                        ].unsqueeze(0)
+                        lidar_seg_mask = torch.nn.functional.interpolate(
+                            lidar_seg_mask, scale_factor=int(1 / ratio), mode="bilinear"
+                        )
+                        _, lidar_seg_mask = torch.max(lidar_seg_mask, 1)
+
+                        lidar_gt_mask = target[0][i][
+                            :, pad_h : height - pad_h, pad_w : width - pad_w
+                        ].unsqueeze(0)
+                        lidar_gt_mask = torch.nn.functional.interpolate(
+                            lidar_gt_mask, scale_factor=int(1 / ratio), mode="bilinear"
+                        )
+                        _, lidar_gt_mask = torch.max(lidar_gt_mask, 1)
+
+                        lidar_seg_mask = lidar_seg_mask.int().squeeze().cpu().numpy()
+                        lidar_gt_mask = lidar_gt_mask.int().squeeze().cpu().numpy()
+                        plot_img_and_mask(
+                            img_test, lidar_seg_mask > 0.5, i, epoch, save_dir
+                        )
+
+                        # _ = show_seg_result(img_test, da_seg_mask, i, epoch, save_dir)
+                        # _ = show_seg_result(
+                        #     img_test1, da_gt_mask, i, epoch, save_dir, is_gt=True
+                        # )
 
     # Compute statistics
     # stats : [[all_img_correct]...[all_img_tcls]]
@@ -1209,32 +1220,6 @@ def validate_semantic_kitti(
     if (verbose or (nc <= 20 and not training)) and nc > 1 and len(stats):
         for i, c in enumerate(ap_class):
             print(pf % (names[c], seen, nt[c], p[i], r[i], ap50[i], ap[i]))
-
-    # Print speeds
-    t = tuple(x / seen * 1e3 for x in (t_inf, t_nms, t_inf + t_nms)) + (
-        imgsz,
-        imgsz,
-        batch_size,
-    )  # tuple
-    if not training:
-        print(
-            "Speed: %.1f/%.1f/%.1f ms inference/NMS/total per %gx%g image at batch-size %g"
-            % t
-        )
-
-    # Plots
-    if config.TEST.PLOTS:
-        confusion_matrix.plot(save_dir=save_dir, names=list(names.values()))
-        if wandb and wandb.run:
-            wandb.log({"Images": wandb_images})
-            wandb.log(
-                {
-                    "Validation": [
-                        wandb.Image(str(f), caption=f.name)
-                        for f in sorted(save_dir.glob("test*.jpg"))
-                    ]
-                }
-            )
 
     # Save JSON
     if config.TEST.SAVE_JSON and len(jdict):
@@ -1280,12 +1265,13 @@ def validate_semantic_kitti(
     for i, c in enumerate(ap_class):
         maps[c] = ap[i]
 
-    da_segment_result = (da_acc_seg.avg, da_IoU_seg.avg, da_mIoU_seg.avg)
-    ll_segment_result = (0, 0, 0)
+    lidar_segment_result = (lidar_acc_seg.avg, lidar_IoU_seg.avg, lidar_mIoU_seg.avg)
+    da_segment_result = (0, 0, 0)
 
     detect_result = np.asarray([mp, mr, map50, map])
     t = [T_inf.avg, T_nms.avg]
-    return da_segment_result, ll_segment_result, detect_result, losses.avg, maps, t
+    return da_segment_result, lidar_segment_result, detect_result, losses.avg, maps, t
+
 
 
 def validate_road_kitti(

@@ -38,14 +38,14 @@ YOLOMM = [
     [-1, BottleneckCSP, [16, 16, 1]],  # 1
     [-1, WidthConv, [16, 32, 3, 2]],  # 2
     [-1, BottleneckCSP, [32, 32, 1]],  # 3
-    [-1, WidthConv, [32, 64, 3, 2]],  # 4 
-    [-1, BottleneckCSP, [64, 64, 1]], # 5
-    [-1, WidthConv, [64, 64, 3, 2]],  # 6
-    [-1, BottleneckCSP, [64, 64, 1]],  # 7 end of proj branch
+    [-1, WidthConv, [32, 32, 3, 2]],  # 4 
+    [-1, BottleneckCSP, [32, 32, 1]], # 5
+    [-1, WidthConv, [32, 32, 3, 2]],  # 6
+    [-1, BottleneckCSP, [32, 32, 1]],  # 7 end of proj branch
     [-1, Focus, [3, 32, 3]],  # 8 start of img branch
-    [-1, Conv, [32, 64, 3, 2]],  # 9
-    [-1, BottleneckCSP, [64, 64, 1]],  # 10
-    [[-1, 7], Add, []], # 11 join both branches
+    [-1, Conv, [32, 32, 3, 2]],  # 9
+    [-1, BottleneckCSP, [32, 32, 1]],  # 10
+    [[-1, 7], Concat, [1]], # 11 join both branches
     [-1, Conv, [64, 128, 3, 2]],  # 12
     [-1, BottleneckCSP, [128, 128, 3]],  # 13
     [-1, Conv, [128, 256, 3, 2]],  # 14
@@ -89,11 +89,15 @@ YOLOMM = [
     [-1, Upsample, [None, 2, "nearest"]],  # 44
     [-1, BottleneckCSP, [128, 64, 1, False]],  # 45
     [-1, Conv, [64, 32, 3, 1]],  # 46
-    [-1, Upsample, [None, 2, "nearest"]],  # 47
+    [-1, Upsample, [None, (1, 2), "nearest"]],  # 47
     [-1, Conv, [32, 16, 3, 1]],  # 48
     [-1, BottleneckCSP, [16, 8, 1, False]],  # 49
-    [-1, Upsample, [None, 2, "nearest"]],  # 50
-    [-1, Conv, [8, 2, 3, 1]],  # 51 Lane line segmentation head
+    [-1, Upsample, [None, (1, 2), "nearest"]],  # 50
+    [-1, Conv, [8, 8, 3, 1]],  # 51
+    [-1, Upsample, [None, (1, 2), "nearest"]],  # 52
+    [-1, Conv, [8, 8, 3, 1]],  # 53
+    [-1, Upsample, [None, (1, 2), "nearest"]],  # 54
+    [-1, Conv, [8, 2, 3, 1]],  # 55 Lidar segmentation head
 ]
 
 
