@@ -323,24 +323,8 @@ def train_semantic_kitti(
     start = time.time()
     for i, datum in enumerate(train_loader):
         (
-            proj,
-            proj_mask,
-            proj_labels,
-            unproj_labels,
-            path_seq,
-            path_name,
-            proj_x,
-            proj_y,
-            proj_range,
-            unproj_range,
-            proj_xyz,
-            unproj_xyz,
-            proj_remission,
-            unproj_remissions,
-            unproj_n_points,
-            shapes,
+            img, target, _, shapes, proj, proj_labels
         ) = datum
-        input = proj_range
         target = proj_labels
 
         intermediate = time.time()
@@ -373,15 +357,17 @@ def train_semantic_kitti(
 
         data_time.update(time.time() - start)
         if not cfg.DEBUG:
-            # TODO: This is an temporary solution
-            tmp = input.unsqueeze(1)
-            input = torch.cat((tmp, tmp, tmp), axis=1).to(device, non_blocking=True)
-            target = target.to(device, non_blocking=True)
+            input = img.to(device, non_blocking=True)
+            proj = proj.to(device, non_blocking=True)
+            proj_labels = proj_labels.to(device, non_blocking=True)
+            assign_target = []
+            for tgt in target:
+                assign_target.append(tgt.to(device))
+            target = assign_target
 
-            print("Target_shape, debug", target.shape)
         with amp.autocast(enabled=device.type != "cpu"):
-            outputs = model(input)
-            total_loss, head_losses = criterion(outputs, target, shapes, model)  # TODO
+            outputs = model(input, proj)
+            total_loss, head_losses = criterion(outputs, proj_labels, shapes, model)  # TODO
 
         # compute gradient and do update step
         optimizer.zero_grad()
@@ -1099,7 +1085,7 @@ def validate_semantic_kitti(
     model.eval()
     jdict, stats, ap, ap_class, wandb_images = [], [], [], [], []
 
-    for batch_i, (img, target, paths, shapes) in tqdm(
+    for batch_i, (img, target, paths, shapes, proj, proj_labels) in tqdm(
         enumerate(val_loader), total=len(val_loader)
     ):
         if not config.DEBUG:
@@ -1117,7 +1103,7 @@ def validate_semantic_kitti(
             ratio = shapes[0][1][0][0]
 
             t = time_synchronized()
-            det_out, da_seg_out, lidar_seg_out = model(img)
+            det_out, da_seg_out, lidar_seg_out = model(img, proj)
             t_inf = time_synchronized() - t
             if batch_i > 0:
                 T_inf.update(t_inf / img.size(0), img.size(0))
@@ -1140,6 +1126,7 @@ def validate_semantic_kitti(
             lidar_IoU_seg.update(lidar_IoU, img.size(0))
             lidar_mIoU_seg.update(lidar_mIoU, img.size(0))
 
+            # torch.log(output.clamp(min=1e-8)
             total_loss, head_losses = criterion(
                 (train_out, da_seg_out, lidar_seg_out), target, shapes, model
             )  # Compute loss

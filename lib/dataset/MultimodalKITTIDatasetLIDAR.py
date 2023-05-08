@@ -142,15 +142,15 @@ class MultimodalKITTIDatasetLIDAR(Dataset):
             print("parsing seq {}".format(seq))
 
             # get paths for each
-            scan_path = os.path.join(self.label_root, seq, "velodyne")
-            label_path = os.path.join(self.label_root, seq, "labels")
+            sequence_scan_path = os.path.join(self.label_root, seq, "velodyne")
+            sequence_label_path = os.path.join(self.label_root, seq, "labels")
             img_path = Path(os.path.join(self.img_root, seq, "image_2"))
 
             self.img_list = img_path.iterdir()
 
             for image_path in tqdm(list(self.img_list)):
-                scan_path = os.path.join(scan_path, image_path.stem + ".bin")
-                label_path = os.path.join(label_path, image_path.stem + ".label")
+                scan_path = os.path.join(sequence_scan_path, image_path.stem + ".bin")
+                label_path = os.path.join(sequence_label_path, image_path.stem + ".label")
 
                 rec = [{"image": str(image_path), "label_path": label_path, "scan_path": scan_path}]
                 gt_db += rec
@@ -210,16 +210,29 @@ class MultimodalKITTIDatasetLIDAR(Dataset):
         )
         shapes = (h0, w0), ((h / h0, w / w0), pad)  # for COCO mAP rescaling
 
-        #labels_out = self.get_bounding_boxes(data["label"], img, ratio, pad, h, w)
         labels_out = []
-        lidar_data = self.get_lidar_data(idx)
+        (proj,
+            proj_mask,
+            proj_labels,
+            unproj_labels,
+            path_seq,
+            path_name,
+            proj_x,
+            proj_y,
+            proj_range,
+            unproj_range,
+            proj_xyz,
+            unproj_xyz,
+            proj_remission,
+            unproj_remissions,
+            unproj_n_points) = self.get_lidar_data(idx)
 
         img = np.ascontiguousarray(img)
 
         target = labels_out
         img = self.transform(img)
 
-        return img, target, data["image"], shapes, lidar_data[0] # TODO: Return lidar labels
+        return img, target, data["image"], shapes, proj, proj_labels
 
     def get_bounding_boxes(self, det_label, img, ratio, pad, h, w):
         labels = []
@@ -258,20 +271,20 @@ class MultimodalKITTIDatasetLIDAR(Dataset):
         label_file = self.db[idx]["label_path"]
 
         # open a semantic laserscan
-        scan = SemLaserScan(self.color_map,
+        scan = SemLaserScan(
+            self.color_map,
             project=True,
             H=self.sensor_img_H,
             W=self.sensor_img_W,
             fov_up=self.sensor_fov_up,
             fov_down=self.sensor_fov_down)
-
+        
+        scan.open_scan(scan_file)
         scan.open_label(label_file)
+
         # map unused classes to used classes (also for projection)
         scan.sem_label = self.map(scan.sem_label, self.learning_map)
         scan.proj_sem_label = self.map(scan.proj_sem_label, self.learning_map)
-
-        # open and obtain scan
-        scan.open_scan(scan_file)
 
         # make a tensor of the uncompressed data (with the max num points)
         unproj_n_points = scan.points.shape[0]
@@ -312,10 +325,7 @@ class MultimodalKITTIDatasetLIDAR(Dataset):
         path_split = path_norm.split(os.sep)
         path_seq = path_split[-3]
         path_name = path_split[-1].replace(".bin", ".label")
-
-        print("proj labels: ", proj_labels.shape)
-        print("unproj labels: ", unproj_labels.shape)
-
+        
         # return
         return (
             proj,

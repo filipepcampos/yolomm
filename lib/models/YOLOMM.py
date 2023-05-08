@@ -32,7 +32,7 @@ from lib.utils.utils import time_synchronized
 
 # The lane line and the driving area segment branches without share information with each other and without link
 YOLOMM = [
-    [33, 41, 51],  # Det_out_idx, Da_Segout_idx, LL_Segout_idx
+    [33, 42, 55],  # Det_out_idx, Da_Segout_idx, LL_Segout_idx
     [0, 8], # Proj_idx, Img_idx
     [-1, WidthConv, [5, 16, 3, 2]],  # 0 start of proj branch
     [-1, BottleneckCSP, [16, 16, 1]],  # 1
@@ -97,7 +97,7 @@ YOLOMM = [
     [-1, Upsample, [None, (1, 2), "nearest"]],  # 52
     [-1, Conv, [8, 8, 3, 1]],  # 53
     [-1, Upsample, [None, (1, 2), "nearest"]],  # 54
-    [-1, Conv, [8, 2, 3, 1]],  # 55 Lidar segmentation head
+    [-1, Conv, [8, 20, 3, 1]],  # 55 Lidar segmentation head
 ]
 
 
