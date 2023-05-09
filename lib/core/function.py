@@ -419,7 +419,9 @@ def test_semantic_kitti(
     model,
     logger,
     device,
-    ignore_data
+    ignore_data,
+    post=None,
+    class_strings=None,
 ):
     # make lookup table for mapping
     maxkey = 0
@@ -469,24 +471,23 @@ def test_semantic_kitti(
         proj_mask = proj_mask.to(device)
         p_x = p_x.to(device)
         p_y = p_y.to(device)
-        if False:
-            proj_range = proj_range.cuda()
-            unproj_range = unproj_range.cuda()
+        proj_range = proj_range.to(device)
+        unproj_range = unproj_range.to(device)
 
         # compute output
         proj_output = model(img, proj)
         proj_argmax = proj_output[2][0].argmax(dim=0)
 
-        # if self.post: TODO
-        #   # knn postproc
-        #   unproj_argmax = self.post(proj_range,
-        #                             unproj_range,
-        #                             proj_argmax,
-        #                             p_x,
-        #                             p_y)
-        # else:
-          # put in original pointcloud using indexes
-        unproj_argmax = proj_argmax[p_y, p_x] # TODO: indent
+        if post:
+            # knn postproc
+            unproj_argmax = post(proj_range,
+                                    unproj_range,
+                                    proj_argmax,
+                                    p_x,
+                                    p_y)
+        else:
+            # put in original pointcloud using indexes
+            unproj_argmax = proj_argmax[p_y, p_x]
 
         
         if i % 100 == 0:
@@ -540,11 +541,10 @@ def test_semantic_kitti(
             'IoU avg {m_jaccard:.3f}'.format(m_accuracy=m_accuracy,
                                             m_jaccard=m_jaccard))
     # print also classwise
-    # for i, jacc in enumerate(class_jaccard):
-    #     if i not in ignore:
-    #     print('IoU class {i:} [{class_str:}] = {jacc:.3f}'.format(
-    #         i=i, class_str=class_strings[class_inv_remap[i]], jacc=jacc))
-        
+    for i, jacc in enumerate(class_jaccard):
+        if i not in ignore:
+            print('IoU class {i:} [{class_str:}] = {jacc:.3f}'.format(
+                i=i, class_str=class_strings[dataset.learning_map_inv[i]], jacc=jacc))
 
 
 def validate(
