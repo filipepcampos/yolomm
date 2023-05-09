@@ -1,5 +1,6 @@
 import time
 from lib.core.evaluate import ConfusionMatrix, SegmentationMetric
+from lib.core.lidar_eval import iouEval
 from lib.core.general import (
     non_max_suppression,
     check_img_size,
@@ -14,6 +15,7 @@ from lib.core.general import (
 )
 from lib.utils.utils import time_synchronized
 from lib.utils import plot_img_and_mask, plot_one_box, show_seg_result
+from lib.dataset.laserscan import SemLaserScan
 import torch
 from threading import Thread
 import numpy as np
@@ -323,7 +325,7 @@ def train_semantic_kitti(
     start = time.time()
     for i, datum in enumerate(train_loader):
         (
-            img, target, _, shapes, proj, proj_labels
+            img, target, _, shapes, proj, proj_labels, _
         ) = datum
         target = proj_labels
 
@@ -409,6 +411,140 @@ def train_semantic_kitti(
                 writer.add_scalar("train_loss", losses.val, global_steps)
                 # writer.add_scalar('train_acc', acc.val, global_steps)
                 writer_dict["train_global_steps"] = global_steps + 1
+
+def test_semantic_kitti(
+    cfg,
+    dataset,
+    test_loader,
+    model,
+    logger,
+    device,
+    ignore_data
+):
+    # make lookup table for mapping
+    maxkey = 0
+    for key, data in dataset.learning_map.items():
+        if key > maxkey:
+            maxkey = key
+    # +100 hack making lut bigger just in case there are unknown labels
+    remap_lut = np.zeros((maxkey + 100), dtype=np.int32)
+    for key, data in dataset.learning_map.items():
+        try:
+            remap_lut[key] = data
+        except IndexError:
+            print("Wrong key ", key)
+
+    ignore = []
+    for cl, ign in ignore_data.items():
+        if ign:
+            x_cl = int(cl)
+            ignore.append(x_cl)
+            print("Ignoring xentropy class ", x_cl, " in IoU evaluation")
+
+
+    data_time = AverageMeter()
+
+    model.eval()
+    evaluator = iouEval(20, device, ignore)
+    evaluator.reset()
+
+    ####################################################
+    ####################################################
+
+    with torch.no_grad():
+      end = time.time()
+
+      for i, (img, _, _, _, proj, _, (proj_in, proj_mask, proj_labels, unproj_labels, path_seq, path_name, p_x, p_y, proj_range, unproj_range, proj_xyz, unproj_xyz, proj_remission, _, npoints)) in enumerate(test_loader):
+        # first cut to rela size (batch size one allows it)
+        p_x = p_x[0, :npoints]
+        p_y = p_y[0, :npoints]
+        proj_range = proj_range[0, :npoints]
+        unproj_range = unproj_range[0, :npoints]
+        path_seq = path_seq[0]
+        path_name = path_name[0]
+
+        proj_in = proj_in.to(device)
+        img = img.to(device)
+        proj = proj.to(device)
+        proj_mask = proj_mask.to(device)
+        p_x = p_x.to(device)
+        p_y = p_y.to(device)
+        if False:
+            proj_range = proj_range.cuda()
+            unproj_range = unproj_range.cuda()
+
+        # compute output
+        proj_output = model(img, proj)
+        proj_argmax = proj_output[2][0].argmax(dim=0)
+
+        # if self.post: TODO
+        #   # knn postproc
+        #   unproj_argmax = self.post(proj_range,
+        #                             unproj_range,
+        #                             proj_argmax,
+        #                             p_x,
+        #                             p_y)
+        # else:
+          # put in original pointcloud using indexes
+        unproj_argmax = proj_argmax[p_y, p_x] # TODO: indent
+
+        
+        if i % 100 == 0:
+            print("Infered seq", path_seq, "scan", path_name,
+                "in", time.time() - end, "sec")
+        end = time.time()
+
+        # save scan
+        # get the first scan in batch and project scan
+        pred_np = unproj_argmax.cpu().numpy()
+        pred_np = pred_np.reshape((-1)).astype(np.int32)
+
+        # map to original label
+        pred_np =  dataset.map(pred_np, dataset.learning_map_inv)
+        
+        # save scan
+        path = os.path.join("/home/up201905609", "sequences",
+                            path_seq, "predictions", path_name)
+        pred_np.tofile(path)
+
+        # eval
+        u_label_sem = remap_lut[unproj_labels]
+        
+        scan_file = f"/data/auto/semantic-kitti/sequences/{path_seq}/velodyne/{path_name[:-6]}.bin"
+        label_file = f"/data/auto/semantic-kitti/sequences/{path_seq}/labels/{path_name}"
+        pred_file = str(path)
+
+        label = SemLaserScan(project=False)
+        label.open_scan(scan_file)
+        label.open_label(label_file)
+        u_label_sem = remap_lut[label.sem_label]  # remap to xentropy format
+        u_label_sem = u_label_sem[:150000]
+
+        pred = SemLaserScan(project=False)
+        pred.open_scan(scan_file)
+        pred.open_label(pred_file)
+        u_pred_sem = remap_lut[pred.sem_label]
+        u_pred_sem = u_pred_sem[:150000]
+
+        evaluator.addBatch(u_pred_sem, u_label_sem)
+
+    ####################################################
+    ####################################################
+
+    # when I am done, print the evaluation
+    m_accuracy = evaluator.getacc()
+    m_jaccard, class_jaccard = evaluator.getIoU()
+
+    print('Validation set:\n'
+            'Acc avg {m_accuracy:.3f}\n'
+            'IoU avg {m_jaccard:.3f}'.format(m_accuracy=m_accuracy,
+                                            m_jaccard=m_jaccard))
+    # print also classwise
+    # for i, jacc in enumerate(class_jaccard):
+    #     if i not in ignore:
+    #     print('IoU class {i:} [{class_str:}] = {jacc:.3f}'.format(
+    #         i=i, class_str=class_strings[class_inv_remap[i]], jacc=jacc))
+        
 
 
 def validate(

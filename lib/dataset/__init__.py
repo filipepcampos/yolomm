@@ -6,3 +6,4 @@ from .AutoDriveDataset import AutoDriveDataset
 from .MultimodalKITTIDataset import MultimodalKITTIDataset
 from .MultimodalKITTIDatasetLIDAR import MultimodalKITTIDatasetLIDAR
 from .DemoDataset import LoadImages, LoadStreams
+from .laserscan import LaserScan, SemLaserScan

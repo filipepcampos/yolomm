@@ -452,11 +452,6 @@ class KITTILidarHeadLoss(nn.Module):
 
         CrossEntropySeg = self.losses[0]
 
-        print(f"target len: {len(targets)}")
-        print(f"pred len: {len(predictions)}")
-        print(f"target shape: {targets.shape}")
-        print(f"pred shape: {predictions[2].shape}")
-
         # Calculate Losses
         lidar_seg_predicts = predictions[2]
         lidar_seg_targets = targets

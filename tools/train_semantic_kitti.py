@@ -19,14 +19,13 @@ import torch.utils.data.distributed
 import torchvision.transforms as transforms
 import numpy as np
 import yaml
-from lib.utils import DataLoaderX, torch_distributed_zero_first
+from lib.utils import DataLoaderX
 from tensorboardX import SummaryWriter
 
 import lib.dataset as dataset
-from lib.dataset.semantic_kitti import Parser
 from lib.config import cfg
 from lib.config import update_config
-from lib.core.loss import get_kitti_da_loss
+from lib.core.loss import get_kitti_lidar_loss
 from lib.core.function import train_semantic_kitti
 from lib.core.function import validate_semantic_kitti
 from lib.core.general import fitness
@@ -78,13 +77,12 @@ def override_config(cfg):
     A quick trick to ensure the correct config is always applied
     """
     cfg.defrost()
-    cfg.DATASET.DATAROOT = "/data/auto/semantic-kitti"  # the path of images folder
     cfg.DATASET.DATACFG = "/home/up201905609/yolomm/lib/config/semantic_kitti_v2.yaml"
-    cfg.DATASET.DATASET = "SemanticKITTI"
+    cfg.DATASET.DATASET = "MultimodalKITTIDatasetLIDAR"
     cfg.DATASET.DATA_FORMAT = "png"
     cfg.DATASET.SELECT_DATA = False
     cfg.DATASET.ORG_IMG_SIZE = [512, 1382]
-    cfg.MODEL.IMAGE_SIZE = [2048, 64]  # width * height, ex: 192 * 256
+    cfg.MODEL.IMAGE_SIZE = [512, 256]  # width * height, ex: 192 * 256
     cfg.num_seg_class = 13
     cfg.freeze()
 
@@ -150,7 +148,7 @@ def main():
     # print("finish build model")
 
     # define loss function (criterion) and optimizer
-    criterion = get_kitti_da_loss(cfg, device=device)
+    criterion = get_kitti_lidar_loss(cfg, device=device)
     optimizer = get_optimizer(cfg, model)
 
     # load checkpoint model
@@ -313,45 +311,31 @@ def main():
         mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
     )
 
-    print("dataset")
+    print("dataset, ", cfg.DATASET.DATASET)
     data = yaml.safe_load(open(cfg.DATASET.DATACFG, 'r'))
 
-    parser = Parser(
+    dataset = eval("dataset." + cfg.DATASET.DATASET)(
         cfg=cfg,
-        root=cfg.DATASET.DATAROOT,
-        train_sequences=data["split"]["train"],
-        valid_sequences=data["split"]["valid"],
-        test_sequences=None,
+        is_train=True,
+        inputsize=cfg.MODEL.IMAGE_SIZE,
+        transform=transforms.Compose(
+            [
+                transforms.ToTensor(),
+                normalize,
+            ]
+        ),
         labels=data["labels"],
         color_map=data["color_map"],
         learning_map=data["learning_map"],
         learning_map_inv=data["learning_map_inv"],
-        # sensor=self.ARCH["dataset"]["sensor"],
-        # max_points=self.ARCH["dataset"]["max_points"],
         sensor=data["sensor"],
         max_points=150000,
-        batch_size=cfg.TRAIN.BATCH_SIZE_PER_GPU * len(cfg.GPUS),
-        workers=cfg.WORKERS,
-        gt=True,
-        shuffle_train=True,
+        sequences=data["split"]["train"]
     )
 
-    train_dataset = parser.get_train_set()
-
-    # DEBUG TODO
-    # datum = train_dataset[0]
-    # proj, proj_mask, proj_labels, unproj_labels, path_seq, path_name, proj_x, proj_y, proj_range, unproj_range, proj_xyz, unproj_xyz, proj_remission, unproj_remissions, unproj_n_points, shapes = datum
-    # import matplotlib.pyplot as plt
-    # print(proj.shape)
-    # print(proj_labels.shape)
-    # print(proj_range)
-
-    # plt.imshow(proj_labels)
-    # plt.savefig('proj_labels.png')
-    # kk
-
+    TRAIN_SIZE = 0.8
     train_dataset = torch.utils.data.Subset(
-        train_dataset, range(0, 5, 1)
+        dataset, range(0, int(len(dataset)*TRAIN_SIZE), 1)
     )
 
     train_sampler = (
@@ -372,10 +356,9 @@ def main():
     num_batch = len(train_loader)
 
     if rank in [-1, 0]:
-        valid_dataset = parser.get_valid_set()
-
+        # TODO: change subset
         valid_dataset = torch.utils.data.Subset(
-            valid_dataset, range(0, 2, 1)
+            dataset, range(int(TRAIN_SIZE*len(dataset)), len(dataset), 1)
         )
 
         valid_loader = DataLoaderX(
@@ -438,28 +421,28 @@ def main():
             epoch % cfg.TRAIN.VAL_FREQ == 0 or epoch == cfg.TRAIN.END_EPOCH
         ) and rank in [-1, 0]:
             # print('validate')
-            (
-                da_segment_results,
-                ll_segment_results,
-                detect_results,
-                total_loss,
-                maps,
-                times,
-            ) = validate_semantic_kitti(
-                epoch,
-                cfg,
-                valid_loader,
-                valid_dataset,
-                model,
-                criterion,
-                final_output_dir,
-                tb_log_dir,
-                writer_dict,
-                logger,
-                device,
-                rank,
-            )
-            fi = fitness(np.array(detect_results).reshape(1, -1))  # 目标检测评价指标
+            # (
+            #     da_segment_results,
+            #     ll_segment_results,
+            #     detect_results,
+            #     total_loss,
+            #     maps,
+            #     times,
+            # ) = validate_semantic_kitti(
+            #     epoch,
+            #     cfg,
+            #     valid_loader,
+            #     valid_dataset,
+            #     model,
+            #     criterion,
+            #     final_output_dir,
+            #     tb_log_dir,
+            #     writer_dict,
+            #     logger,
+            #     device,
+            #     rank,
+            # )
+            # fi = fitness(np.array(detect_results).reshape(1, -1))  # 目标检测评价指标
 
             msg = (
                 "Epoch: [{0}]    Loss({loss:.3f})\n"
@@ -468,19 +451,19 @@ def main():
                 "Detect: P({p:.3f})  R({r:.3f})  mAP@0.5({map50:.3f})  mAP@0.5:0.95({map:.3f})\n"
                 "Time: inference({t_inf:.4f}s/frame)  nms({t_nms:.4f}s/frame)".format(
                     epoch,
-                    loss=total_loss,
-                    da_seg_acc=da_segment_results[0],
-                    da_seg_iou=da_segment_results[1],
-                    da_seg_miou=da_segment_results[2],
-                    ll_seg_acc=ll_segment_results[0],
-                    ll_seg_iou=ll_segment_results[1],
-                    ll_seg_miou=ll_segment_results[2],
-                    p=detect_results[0],
-                    r=detect_results[1],
-                    map50=detect_results[2],
-                    map=detect_results[3],
-                    t_inf=times[0],
-                    t_nms=times[1],
+                    loss=0,
+                    da_seg_acc=0,
+                    da_seg_iou=0,
+                    da_seg_miou=0,
+                    ll_seg_acc=0,
+                    ll_seg_iou=0,
+                    ll_seg_miou=0,
+                    p=0,
+                    r=0,
+                    map50=0,
+                    map=0,
+                    t_inf=0,
+                    t_nms=0,
                 )
             )
             logger.info(msg)

@@ -211,6 +211,7 @@ class MultimodalKITTIDatasetLIDAR(Dataset):
         shapes = (h0, w0), ((h / h0, w / w0), pad)  # for COCO mAP rescaling
 
         labels_out = []
+        lidar_data = self.get_lidar_data(idx)
         (proj,
             proj_mask,
             proj_labels,
@@ -225,14 +226,14 @@ class MultimodalKITTIDatasetLIDAR(Dataset):
             unproj_xyz,
             proj_remission,
             unproj_remissions,
-            unproj_n_points) = self.get_lidar_data(idx)
+            unproj_n_points) = lidar_data
 
         img = np.ascontiguousarray(img)
 
         target = labels_out
         img = self.transform(img)
 
-        return img, target, data["image"], shapes, proj, proj_labels
+        return img, target, data["image"], shapes, proj, proj_labels, lidar_data
 
     def get_bounding_boxes(self, det_label, img, ratio, pad, h, w):
         labels = []
