@@ -236,7 +236,7 @@ def train_mm(
                 assign_target.append(tgt.to(device))
             target = assign_target
         with amp.autocast(enabled=device.type != "cpu"):
-            outputs = model(input, proj)
+            outputs = model(proj)
             total_loss, head_losses = criterion(outputs, target, shapes, model)
 
         # compute gradient and do update step
@@ -1795,7 +1795,7 @@ def validate_kitti(
             ratio = shapes[0][1][0][0]
 
             t = time_synchronized()
-            det_out, da_seg_out, ll_seg_out = model(img, proj)
+            det_out, da_seg_out, ll_seg_out = model(proj)
             t_inf = time_synchronized() - t
             if batch_i > 0:
                 T_inf.update(t_inf / img.size(0), img.size(0))

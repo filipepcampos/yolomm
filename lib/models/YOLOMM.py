@@ -32,7 +32,7 @@ from lib.utils.utils import time_synchronized
 
 # The lane line and the driving area segment branches without share information with each other and without link
 YOLOMM = [
-    [33, 42, 55],  # Det_out_idx, Da_Segout_idx, LL_Segout_idx
+    [29, 38, 51],  # Det_out_idx, Da_Segout_idx, LL_Segout_idx
     [0, 8], # Proj_idx, Img_idx
     [-1, WidthConv, [5, 16, 3, 2]],  # 0 start of proj branch
     [-1, BottleneckCSP, [16, 16, 1]],  # 1
@@ -41,63 +41,59 @@ YOLOMM = [
     [-1, WidthConv, [32, 32, 3, 2]],  # 4 
     [-1, BottleneckCSP, [32, 32, 1]], # 5
     [-1, WidthConv, [32, 32, 3, 2]],  # 6
-    [-1, BottleneckCSP, [32, 32, 1]],  # 7 end of proj branch
-    [-1, Focus, [3, 32, 3]],  # 8 start of img branch
-    [-1, Conv, [32, 32, 3, 2]],  # 9
-    [-1, BottleneckCSP, [32, 32, 1]],  # 10
-    [[-1, 7], Concat, [1]], # 11 join both branches
-    [-1, Conv, [64, 128, 3, 2]],  # 12
-    [-1, BottleneckCSP, [128, 128, 3]],  # 13
-    [-1, Conv, [128, 256, 3, 2]],  # 14
-    [-1, BottleneckCSP, [256, 256, 3]],  # 15
-    [-1, Conv, [256, 512, 3, 2]],  # 16
-    [-1, SPP, [512, 512, [5, 9, 13]]],  # 17
-    [-1, BottleneckCSP, [512, 512, 1, False]],  # 18
-    [-1, Conv, [512, 256, 1, 1]],  # 19
+    [-1, BottleneckCSP, [32, 64, 1]],  # 7 end of proj branch
+    [-1, Conv, [64, 128, 3, 2]],  # 8
+    [-1, BottleneckCSP, [128, 128, 3]],  # 9
+    [-1, Conv, [128, 256, 3, 2]],  # 10
+    [-1, BottleneckCSP, [256, 256, 3]],  # 11
+    [-1, Conv, [256, 512, 3, 2]],  # 12
+    [-1, SPP, [512, 512, [5, 9, 13]]],  # 13
+    [-1, BottleneckCSP, [512, 512, 1, False]],  # 14
+    [-1, Conv, [512, 256, 1, 1]],  # 15
+    [-1, Upsample, [None, 2, "nearest"]],  # 16
+    [[-1, 11], Concat, [1]],  # 17
+    [-1, BottleneckCSP, [512, 256, 1, False]],  # 18
+    [-1, Conv, [256, 128, 1, 1]],  # 19
     [-1, Upsample, [None, 2, "nearest"]],  # 20
-    [[-1, 15], Concat, [1]],  # 21
-    [-1, BottleneckCSP, [512, 256, 1, False]],  # 22
-    [-1, Conv, [256, 128, 1, 1]],  # 23
-    [-1, Upsample, [None, 2, "nearest"]],  # 24
-    [[-1, 13], Concat, [1]],  # 25         #Encoder
-    [-1, BottleneckCSP, [256, 128, 1, False]],  # 26
-    [-1, Conv, [128, 128, 3, 2]],  # 27
-    [[-1, 23], Concat, [1]],  # 28
-    [-1, BottleneckCSP, [256, 256, 1, False]],  # 29
-    [-1, Conv, [256, 256, 3, 2]],  # 30
-    [[-1, 19], Concat, [1]],  # 31
-    [-1, BottleneckCSP, [512, 512, 1, False]],  # 32
+    [[-1, 9], Concat, [1]],  # 21         #Encoder
+    [-1, BottleneckCSP, [256, 128, 1, False]],  # 22
+    [-1, Conv, [128, 128, 3, 2]],  # 23
+    [[-1, 19], Concat, [1]],  # 24
+    [-1, BottleneckCSP, [256, 256, 1, False]],  # 25
+    [-1, Conv, [256, 256, 3, 2]],  # 26
+    [[-1, 15], Concat, [1]],  # 27
+    [-1, BottleneckCSP, [512, 512, 1, False]],  # 28
     [
-        [26, 29, 32],
+        [22, 25, 28],
         Detect,
         [
             1,
             [[3, 9, 5, 11, 4, 20], [7, 18, 6, 39, 12, 31], [19, 50, 38, 81, 68, 157]],
             [128, 256, 512],
         ],
-    ],  # Detection head 33
-    [25, Conv, [256, 128, 3, 1]],  # 34
-    [-1, Upsample, [None, 2, "nearest"]],  # 35
-    [-1, BottleneckCSP, [128, 64, 1, False]],  # 36
-    [-1, Conv, [64, 32, 3, 1]],  # 37
-    [-1, Upsample, [None, 2, "nearest"]],  # 38
-    [-1, Conv, [32, 16, 3, 1]],  # 39
-    [-1, BottleneckCSP, [16, 8, 1, False]],  # 40
-    [-1, Upsample, [None, 2, "nearest"]],  # 41
-    [-1, Conv, [8, 2, 3, 1]],  # 42 Driving area segmentation head
-    [25, Conv, [256, 128, 3, 1]],  # 43
-    [-1, Upsample, [None, 2, "nearest"]],  # 44
-    [-1, BottleneckCSP, [128, 64, 1, False]],  # 45
-    [-1, Conv, [64, 32, 3, 1]],  # 46
-    [-1, Upsample, [None, (1, 2), "nearest"]],  # 47
-    [-1, Conv, [32, 16, 3, 1]],  # 48
-    [-1, BottleneckCSP, [16, 8, 1, False]],  # 49
+    ],  # Detection head 29
+    [21, Conv, [256, 128, 3, 1]],  # 30
+    [-1, Upsample, [None, 2, "nearest"]],  # 31
+    [-1, BottleneckCSP, [128, 64, 1, False]],  # 32
+    [-1, Conv, [64, 32, 3, 1]],  # 33
+    [-1, Upsample, [None, 2, "nearest"]],  # 34
+    [-1, Conv, [32, 16, 3, 1]],  # 35
+    [-1, BottleneckCSP, [16, 8, 1, False]],  # 36
+    [-1, Upsample, [None, 2, "nearest"]],  # 37
+    [-1, Conv, [8, 2, 3, 1]],  # 38 Driving area segmentation head
+    [21, Conv, [256, 128, 3, 1]],  # 39
+    [-1, Upsample, [None, 2, "nearest"]],  # 40
+    [-1, BottleneckCSP, [128, 64, 1, False]],  # 41
+    [-1, Conv, [64, 32, 3, 1]],  # 42
+    [-1, Upsample, [None, (1, 2), "nearest"]],  # 43
+    [-1, Conv, [32, 16, 3, 1]],  # 44
+    [-1, BottleneckCSP, [16, 8, 1, False]],  # 45
+    [-1, Upsample, [None, (1, 2), "nearest"]],  # 46
+    [-1, Conv, [8, 8, 3, 1]],  # 47
+    [-1, Upsample, [None, (1, 2), "nearest"]],  # 48
+    [-1, Conv, [8, 8, 3, 1]],  # 49
     [-1, Upsample, [None, (1, 2), "nearest"]],  # 50
-    [-1, Conv, [8, 8, 3, 1]],  # 51
-    [-1, Upsample, [None, (1, 2), "nearest"]],  # 52
-    [-1, Conv, [8, 8, 3, 1]],  # 53
-    [-1, Upsample, [None, (1, 2), "nearest"]],  # 54
-    [-1, Conv, [8, 20, 3, 1]],  # 55 Lidar segmentation head
+    [-1, Conv, [8, 20, 3, 1]],  # 51 Lidar segmentation head
 ]
 
 
@@ -135,7 +131,7 @@ class MCnet(nn.Module):
             # for x in self.forward(torch.zeros(1, 3, s, s)):
             #     print (x.shape)
             with torch.no_grad():
-                model_out = self.forward(torch.zeros(1, 3, s, s), torch.zeros(1, 5, int(s/4), s*4))
+                model_out = self.forward(torch.zeros(1, 5, int(s/4), s*4))
                 detects, _, _ = model_out
                 Detector.stride = torch.tensor(
                     [s / x.shape[-2] for x in detects]
@@ -150,7 +146,7 @@ class MCnet(nn.Module):
 
         initialize_weights(self)
 
-    def forward(self, img, proj):
+    def forward(self, img):
         cache = []
         out = []
         det_out = None
@@ -164,18 +160,14 @@ class MCnet(nn.Module):
                     else [img if j == -1 else cache[j] for j in block.from_]
                 )  # calculate concat detect
 
-            if i < self.img_idx:
-                proj = block(proj)
-                cache.append(proj if block.index in self.save else None)
-            else:
-                img = block(img)
-                cache.append(img if block.index in self.save else None)
-            
-                if i in self.seg_out_idx:  # save driving area segment result
-                    m = nn.Sigmoid()
-                    out.append(m(img))
-                if i == self.detector_index:
-                    det_out = img
+            img = block(img)
+            cache.append(img if block.index in self.save else None)
+        
+            if i in self.seg_out_idx:  # save driving area segment result
+                m = nn.Sigmoid()
+                out.append(m(img))
+            if i == self.detector_index:
+                det_out = img
         out.insert(0, det_out)
         return out
 

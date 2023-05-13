@@ -314,7 +314,7 @@ def main():
                 normalize,
             ]
         ),
-        sequences=data["split"]["train"],
+        #sequences=data["split"]["train"],
     )
 
     TRAIN_SIZE = 0.8
