@@ -83,6 +83,10 @@ def override_config(cfg):
     cfg.DATASET.SELECT_DATA = False
     cfg.DATASET.ORG_IMG_SIZE = [512, 1382]
     cfg.MODEL.IMAGE_SIZE = [512, 256]  # width * height, ex: 192 * 256
+    cfg.DATASET.DATAROOT = "/data/auto/kitti/odometry/dataset/sequences"  # the path of images folder
+    cfg.DATASET.LABELROOT = "/data/auto/semantic-kitti/sequences"  # the path of det_annotations folder
+    cfg.DATASET.TRAIN_SET = "training"
+    cfg.DATASET.TEST_SET = "testing"
     cfg.num_seg_class = 13
     cfg.freeze()
 

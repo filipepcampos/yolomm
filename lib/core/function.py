@@ -368,7 +368,7 @@ def train_semantic_kitti(
             target = assign_target
 
         with amp.autocast(enabled=device.type != "cpu"):
-            outputs = model(input, proj)
+            outputs = model(proj)
             total_loss, head_losses = criterion(outputs, proj_labels, shapes, model)  # TODO
 
         # compute gradient and do update step
