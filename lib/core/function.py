@@ -475,7 +475,7 @@ def test_semantic_kitti(
         unproj_range = unproj_range.to(device)
 
         # compute output
-        proj_output = model(img, proj)
+        proj_output = model(proj)
         proj_argmax = proj_output[2][0].argmax(dim=0)
 
         if post:

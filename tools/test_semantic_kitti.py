@@ -284,7 +284,7 @@ def main():
     print("load model to device")
     model = get_net(cfg).to(device)
 
-    checkpoint_file = "runs/MultimodalKITTIDatasetLIDAR/_2023-05-09-02-23/epoch-46.pth"
+    checkpoint_file = "runs/MultimodalKITTIDatasetLIDAR/_2023-05-13-21-14/epoch-159.pth"
     model_dict = model.state_dict()
     logger.info("=> loading checkpoint '{}'".format(checkpoint_file))
     checkpoint = torch.load(checkpoint_file)
