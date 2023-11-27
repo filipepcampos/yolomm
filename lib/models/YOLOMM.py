@@ -1,34 +1,24 @@
 import torch
-from torch import tensor
 import torch.nn as nn
 import sys, os
 import math
 import sys
 
 sys.path.append(os.getcwd())
-# sys.path.append("lib/models")
-# sys.path.append("lib/utils")
-# sys.path.append("/workspace/wh/projects/DaChuang")
 from lib.utils import initialize_weights
 
-# from lib.models.common2 import DepthSeperabelConv2d as Conv
-# from lib.models.common2 import SPP, Bottleneck, BottleneckCSP, Focus, Concat, Detect
 from lib.models.common import (
     Conv,
     WidthConv,
     SPP,
-    Bottleneck,
     BottleneckCSP,
     Focus,
     Concat,
     Detect,
-    SharpenConv,
-    Add,
 )
 from torch.nn import Upsample
 from lib.utils import check_anchor_order
 from lib.core.evaluate import SegmentationMetric
-from lib.utils.utils import time_synchronized
 
 # The lane line and the driving area segment branches without share information with each other and without link
 YOLOMM = [
@@ -123,7 +113,6 @@ class MCnet(nn.Module):
             save.extend(
                 x % i for x in ([from_] if isinstance(from_, int) else from_) if x != -1
             )  # append to savelist
-        # assert self.detector_index == block_cfg[0][0]
 
         self.model, self.save = nn.Sequential(*layers), sorted(save)
         self.names = [str(i) for i in range(self.nc)]
@@ -132,15 +121,12 @@ class MCnet(nn.Module):
         Detector = self.model[self.detector_index]  # detector
         if isinstance(Detector, Detect):
             s = 128  # 2x min stride
-            # for x in self.forward(torch.zeros(1, 3, s, s)):
-            #     print (x.shape)
             with torch.no_grad():
                 model_out = self.forward(torch.zeros(1, 3, s, s), torch.zeros(1, 5, int(s/4), s*4))
                 detects, _, _ = model_out
                 Detector.stride = torch.tensor(
                     [s / x.shape[-2] for x in detects]
                 )  # forward
-            # print("stride"+str(Detector.stride ))
             Detector.anchors /= Detector.stride.view(
                 -1, 1, 1
             )  # Set the anchors for the corresponding scale
@@ -154,8 +140,6 @@ class MCnet(nn.Module):
         cache = []
         out = []
         det_out = None
-        Da_fmap = []
-        LL_fmap = []
         for i, block in enumerate(self.model):
             if block.from_ != -1:
                 img = (
@@ -215,7 +199,3 @@ if __name__ == "__main__":
     model_out, SAD_out = model(input_)
     detects, dring_area_seg, lane_line_seg = model_out
     Da_fmap, LL_fmap = SAD_out
-    for det in detects:
-        print(det.shape)
-    print(dring_area_seg.shape)
-    print(lane_line_seg.shape)
