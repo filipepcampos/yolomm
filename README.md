@@ -27,3 +27,16 @@ You can set the training configuration in the `./lib/config/default.py`. (Includ
 
 After that, execute the scripts present in the `tools` directory.
 
+## Publication
+
+This work was published on CIARP 2023: [YOLOMM – You Only Look Once for Multi-modal Multi-tasking](https://link.springer.com/chapter/10.1007/978-3-031-49018-7_40).
+```bibtex
+@inproceedings{campos2023yolomm,
+  title={{YOLOMM}--You Only Look Once for Multi-modal Multi-tasking},
+  author={Campos, Filipe and Cerqueira, Francisco Gon{\c{c}}alves and Cruz, Ricardo PM and Cardoso, Jaime S},
+  booktitle={Iberoamerican Congress on Pattern Recognition},
+  pages={564--574},
+  year={2023},
+  organization={Springer}
+}
+```
